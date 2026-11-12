@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Synapse - Campus Matchmaker</title>
+  <script>try { document.documentElement.dataset.theme = localStorage.getItem('synapse-theme') === 'dark' ? 'dark' : 'light'; } catch (error) {}</script>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/js/app.js" defer></script>
+</head>
+<body>
+  <nav class="navbar">
+    <div class="logo">SYNAPSE</div>
+    <div class="nav-links">
+      <a href="/index.html">Discover Projects</a>
+      <a href="/create.html">+ Post Project</a>
+      <a href="/profile.html">My Activity</a>
+      <a href="/admin.html">Faculty Portal</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <header class="page-intro">
+      <div class="page-intro-copy">
+        <span class="eyebrow">Campus collaboration, with a plan</span>
+        <h1>Build better teams. Make real things.</h1>
+        <p>Find a project that fits your goals, apply for a clear role, and show what you can bring to the team.</p>
+      </div>
+      <a class="btn-primary" href="/create.html">Start a project <span aria-hidden="true">→</span></a>
+    </header>
+
+    <section class="feed-summary" aria-label="Project feed summary">
+      <div><strong id="projectCount">—</strong><span>open projects</span></div>
+      <div><strong id="vacancyCount">—</strong><span>open roles</span></div>
+      <p>Every role has clear skills, a real team lead, and a structured application.</p>
+    </section>
+
+    <div class="filter-bar">
+      <label class="sr-only" for="filterTrack">Filter by project track</label>
+      <select id="filterTrack">
+        <option value="">Every track</option>
+        <option value="Competitive">Competitive (Win-Focused)</option>
+        <option value="Growth">Growth (Learning-Focused)</option>
+      </select>
+      <label class="sr-only" for="filterEvent">Filter by course or event</label>
+      <select id="filterEvent"><option value="">Every course & event</option></select>
+      <label class="sr-only" for="projectSearch">Search projects</label>
+      <input id="projectSearch" type="search" placeholder="Search projects or skills">
+      <button class="btn-secondary" id="clearFilters" type="button">Clear filters</button>
+    </div>
+
+    <div id="projectFeed" aria-live="polite">
+      <p class="card" role="status">Loading open projects...</p>
+    </div>
+  </div>
+
+  <script>
+    let allProjects = [];
+
+    function appendText(parent, tag, className, value) {
+      const element = document.createElement(tag);
+      if (className) element.className = className;
+      element.textContent = value;
+      parent.appendChild(element);
+      return element;
+    }
+
+    function renderProjects() {
+      const track = document.getElementById('filterTrack').value;
+      const eventTag = document.getElementById('filterEvent').value;
+      const search = document.getElementById('projectSearch').value.trim().toLowerCase();
+      const filtered = allProjects.filter(project => {
+        const searchable = `${project.title} ${project.description} ${project.event_tag} ${project.vacancies.map(role => `${role.role_title} ${role.required_skills}`).join(' ')}`.toLowerCase();
+        return (!track || project.track === track) &&
+          (!eventTag || project.event_tag === eventTag) &&
+          (!search || searchable.includes(search));
+      });
+      const feed = document.getElementById('projectFeed');
+      feed.replaceChildren();
+      if (!filtered.length) {
+        appendText(feed, 'p', 'card empty-state', 'No open projects match those filters yet. Try another track or check back soon.');
+        return;
+      }
+
+      filtered.forEach(project => {
+        const card = document.createElement('article');
+        card.className = 'card project-card';
+        const header = document.createElement('div');
+        header.className = 'card-header';
+        const heading = document.createElement('div');
+        appendText(heading, 'h2', 'card-title', project.title);
+        appendText(heading, 'p', 'project-meta', `${project.event_tag} · Led by ${project.leader_name}`);
+        header.appendChild(heading);
+        appendText(header, 'span', `badge ${project.track === 'Competitive' ? 'badge-competitive' : 'badge-growth'}`, project.track);
+        card.appendChild(header);
+        appendText(card, 'p', 'project-description', project.description);
+
+        const rolesHeading = appendText(card, 'h3', 'roles-heading', 'Open roles');
+        rolesHeading.setAttribute('aria-label', 'Open roles');
+        const roleList = document.createElement('div');
+        roleList.className = 'role-match-list';
+        project.vacancies.filter(role => role.status === 'Open').forEach(role => {
+          const item = document.createElement('article');
+          item.className = 'role-match-row';
+          const roleInfo = document.createElement('div');
+          appendText(roleInfo, 'strong', 'role-match-title', role.role_title);
+          appendText(roleInfo, 'span', 'role-match-skills', role.required_skills);
+          item.appendChild(roleInfo);
+
+          if (project.is_leader) {
+            const manage = document.createElement('a');
+            manage.className = 'btn-secondary role-match-action';
+            manage.href = `/project.html?id=${encodeURIComponent(project.id)}`;
+            manage.textContent = 'Review team';
+            item.appendChild(manage);
+          } else if (role.application_status) {
+            const status = document.createElement('span');
+            status.className = `activity-status status-${role.application_status.toLowerCase()}`;
+            status.textContent = `Applied · ${role.application_status}`;
+            item.appendChild(status);
+          } else if (project.is_member) {
+            appendText(item, 'span', 'activity-status', 'Already on a team');
+          } else {
+            const apply = document.createElement('a');
+            apply.className = 'btn-primary role-match-action';
+            apply.href = `/project.html?id=${encodeURIComponent(project.id)}&role=${encodeURIComponent(role.id)}`;
+            apply.textContent = 'Apply for this role';
+            apply.setAttribute('aria-label', `Apply for ${role.role_title} on ${project.title}`);
+            item.appendChild(apply);
+          }
+          roleList.appendChild(item);
+        });
+        card.appendChild(roleList);
+
+        const actions = document.createElement('div');
+        actions.className = 'project-card-actions';
+        const link = document.createElement('a');
+        link.className = 'btn-primary';
+        link.href = `/project.html?id=${encodeURIComponent(project.id)}`;
+        link.textContent = 'Explore roles';
+        actions.appendChild(link);
+        card.appendChild(actions);
+        feed.appendChild(card);
+      });
+    }
+
+    async function loadProjects() {
+      const feed = document.getElementById('projectFeed');
+      try {
+        const res = await fetch('/api/projects');
+        const projects = await res.json();
+        if (!res.ok) throw new Error(projects.error || 'Unable to load projects.');
+        allProjects = projects;
+        const eventFilter = document.getElementById('filterEvent');
+        const eventTags = [...new Set(projects.map(project => project.event_tag))].sort();
+        eventFilter.replaceChildren(new Option('Every course & event', ''));
+        eventTags.forEach(eventTag => eventFilter.add(new Option(eventTag, eventTag)));
+        document.getElementById('projectCount').textContent = String(projects.length);
+        document.getElementById('vacancyCount').textContent = String(
+          projects.reduce((total, project) => total + project.vacancies.filter(role => role.status === 'Open').length, 0)
+        );
+        renderProjects();
+      } catch (error) {
+        feed.replaceChildren();
+        const message = document.createElement('p');
+        message.className = 'card';
+        message.setAttribute('role', 'alert');
+        message.textContent = error.message;
+        feed.appendChild(message);
+      }
+    }
+
+    document.getElementById('filterTrack').addEventListener('change', renderProjects);
+    document.getElementById('filterEvent').addEventListener('change', renderProjects);
+    document.getElementById('projectSearch').addEventListener('input', renderProjects);
+    document.getElementById('clearFilters').addEventListener('click', () => {
+      document.getElementById('filterTrack').value = '';
+      document.getElementById('filterEvent').value = '';
+      document.getElementById('projectSearch').value = '';
+      renderProjects();
+    });
+
+    loadProjects();
+  </script>
+</body>
+</html>

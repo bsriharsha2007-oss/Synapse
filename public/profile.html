@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>My Profile - Synapse</title>
+  <script>try { document.documentElement.dataset.theme = localStorage.getItem('synapse-theme') === 'dark' ? 'dark' : 'light'; } catch (error) {}</script>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/js/app.js" defer></script>
+</head>
+<body>
+  <nav class="navbar">
+    <div class="logo">SYNAPSE</div>
+    <div class="nav-links">
+      <a href="/index.html">Discover Projects</a>
+      <a href="/create.html">+ Post Project</a>
+      <a href="/profile.html">My Activity</a>
+    </div>
+  </nav>
+
+  <main class="container">
+    <header class="activity-intro">
+      <span class="eyebrow">Your Synapse workspace</span>
+      <h1>My activity</h1>
+      <p>Keep track of projects you lead and roles you have applied for.</p>
+    </header>
+
+    <div class="card profile-card">
+      <h2>Account identity & portfolio</h2>
+      <p id="accountIdentity" class="project-meta"></p>
+      <p id="profileStatus" class="project-meta" role="status" aria-live="polite"></p>
+      <form id="profileForm" style="margin-top: 1rem;">
+        <div class="form-group">
+          <label for="name">Full name</label>
+          <input type="text" id="name" maxlength="100" required>
+        </div>
+        <div class="form-group">
+          <label for="email">College email</label>
+          <input type="email" id="email" maxlength="254" required>
+        </div>
+        <div class="form-group">
+          <label for="skills">Technical skills</label>
+          <input type="text" id="skills" maxlength="500" required placeholder="e.g. HTML, CSS, JavaScript, SQLite">
+        </div>
+        <div class="form-group">
+          <label for="github_url">GitHub profile / portfolio URL</label>
+          <input type="url" id="github_url" maxlength="2048" placeholder="https://github.com/username">
+        </div>
+        <button type="submit" class="btn-primary">Save Profile</button>
+      </form>
+      <section class="password-panel" aria-labelledby="passwordHeading">
+        <h3 id="passwordHeading">Change password</h3>
+        <p class="project-meta">Use at least 10 characters. Your password is stored as a secure hash.</p>
+        <p id="passwordStatus" class="project-meta" role="status" aria-live="polite"></p>
+        <form id="passwordForm">
+          <div class="form-group">
+            <label for="currentPassword">Current password</label>
+            <input id="currentPassword" name="current_password" type="password" autocomplete="current-password" required maxlength="128">
+          </div>
+          <div class="form-group">
+            <label for="newPassword">New password</label>
+            <input id="newPassword" name="new_password" type="password" autocomplete="new-password" minlength="10" required maxlength="128">
+          </div>
+          <button type="submit" class="btn-secondary">Update password</button>
+        </form>
+      </section>
+    </div>
+
+    <section class="activity-section" aria-labelledby="applicationsHeading">
+      <div class="activity-heading">
+        <div>
+          <h2 id="applicationsHeading">My applications</h2>
+          <p>See whether a project lead has reviewed your application.</p>
+        </div>
+        <span class="activity-count" id="applicationCount">—</span>
+      </div>
+      <div id="myApplications" class="activity-grid" aria-live="polite">
+        <p class="card project-meta">Loading applications…</p>
+      </div>
+    </section>
+
+    <section class="activity-section" aria-labelledby="projectsHeading">
+      <div class="activity-heading">
+        <div>
+          <h2 id="projectsHeading">Projects I posted</h2>
+          <p>Track open roles and applications waiting for your decision.</p>
+        </div>
+        <a class="btn-primary" href="/create.html">Post a project</a>
+      </div>
+      <p id="projectDeleteStatus" class="project-meta" role="status" aria-live="polite"></p>
+      <div id="myProjects" class="activity-grid" aria-live="polite">
+        <p class="card project-meta">Loading your projects…</p>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    async function loadProfile() {
+      const res = await fetch('/api/me');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Unable to load your profile.');
+      document.getElementById('name').value = data.name;
+      document.getElementById('email').value = data.email;
+      document.getElementById('skills').value = data.skills;
+      document.getElementById('github_url').value = data.github_url || '';
+      document.getElementById('accountIdentity').textContent =
+        `University ID: ${data.university_id} · Account type: ${data.role === 'admin' ? 'Administrator' : 'Student'}`;
+    }
+
+    function createActivityCard(title, subtitle, status, detail, projectId, actionText, allowDelete = false) {
+      const card = document.createElement('article');
+      card.className = 'card activity-card';
+      const header = document.createElement('div');
+      header.className = 'activity-card-header';
+      const heading = document.createElement('h3');
+      heading.textContent = title;
+      header.appendChild(heading);
+      const badge = document.createElement('span');
+      badge.className = `activity-status status-${status.toLowerCase()}`;
+      badge.textContent = status;
+      header.appendChild(badge);
+      card.appendChild(header);
+      const subtitleText = document.createElement('p');
+      subtitleText.className = 'project-meta';
+      subtitleText.textContent = subtitle;
+      card.appendChild(subtitleText);
+      const detailText = document.createElement('p');
+      detailText.className = 'activity-detail';
+      detailText.textContent = detail;
+      card.appendChild(detailText);
+      const actions = document.createElement('div');
+      actions.className = 'activity-card-actions';
+      const link = document.createElement('a');
+      link.className = 'btn-secondary';
+      link.href = `/project.html?id=${encodeURIComponent(projectId)}`;
+      link.textContent = actionText;
+      actions.appendChild(link);
+      if (allowDelete) {
+        const deleteButton = document.createElement('button');
+        deleteButton.type = 'button';
+        deleteButton.className = 'btn-danger';
+        deleteButton.dataset.projectId = projectId;
+        deleteButton.textContent = 'Delete project';
+        actions.appendChild(deleteButton);
+      }
+      card.appendChild(actions);
+      return card;
+    }
+
+    function renderActivitySection(container, entries, emptyMessage, renderEntry) {
+      container.replaceChildren();
+      if (!entries.length) {
+        const empty = document.createElement('p');
+        empty.className = 'card project-meta empty-activity';
+        empty.textContent = emptyMessage;
+        container.appendChild(empty);
+        return;
+      }
+      entries.forEach(entry => container.appendChild(renderEntry(entry)));
+    }
+
+    async function loadActivity() {
+      const response = await fetch('/api/me/activity');
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Unable to load your project activity.');
+
+      document.getElementById('applicationCount').textContent = String(data.applications.length);
+      renderActivitySection(
+        document.getElementById('myApplications'),
+        data.applications,
+        'You have not applied to any roles yet. Explore open projects to find a role that fits.',
+        application => createActivityCard(
+          application.project_title,
+          `${application.event_tag} · ${application.role_title} · Led by ${application.leader_name}`,
+          application.status,
+          `${application.has_resume ? 'Resume attached' : 'Introduction only'}${application.proof_url ? ' · Resume or portfolio link included' : ''}`,
+          application.project_id,
+          'View application'
+        )
+      );
+      renderActivitySection(
+        document.getElementById('myProjects'),
+        data.projects,
+        'You have not posted a project yet. Publish an idea and open roles for other students.',
+        project => createActivityCard(
+          project.title,
+          `${project.event_tag} · ${project.track} track`,
+          'Posted',
+          `${project.filled_count || 0} / ${project.role_count} roles filled · ${project.pending_count} application${project.pending_count === 1 ? '' : 's'} awaiting review`,
+          project.id,
+          'Review applications',
+          true
+        )
+      );
+    }
+
+    document.getElementById('myProjects').addEventListener('click', async event => {
+      const button = event.target.closest('button[data-project-id]');
+      if (!button) return;
+      const confirmed = window.confirm(
+        'Delete this project? Its roles, applications, attached resumes, and team membership records will also be permanently deleted.'
+      );
+      if (!confirmed) return;
+      button.disabled = true;
+      const status = document.getElementById('projectDeleteStatus');
+      status.className = 'project-meta';
+      status.textContent = '';
+      try {
+        const response = await fetch(`/api/projects/${encodeURIComponent(button.dataset.projectId)}`, {
+          method: 'DELETE'
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Unable to delete this project.');
+        status.textContent = result.message;
+        await loadActivity();
+      } catch (error) {
+        status.className = 'auth-error';
+        status.textContent = error.message;
+        button.disabled = false;
+      }
+    });
+
+    document.getElementById('profileForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const payload = {
+        name: document.getElementById('name').value,
+        email: document.getElementById('email').value,
+        skills: document.getElementById('skills').value,
+        github_url: document.getElementById('github_url').value
+      };
+      const submit = e.currentTarget.querySelector('button[type="submit"]');
+      const status = document.getElementById('profileStatus');
+      submit.disabled = true;
+      status.className = 'project-meta';
+      status.textContent = '';
+      try {
+        const res = await fetch('/api/profile', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Unable to update your profile.');
+        status.textContent = data.message;
+      } catch (error) {
+        status.className = 'auth-error';
+        status.textContent = error.message;
+      } finally {
+        submit.disabled = false;
+      }
+    });
+
+    document.getElementById('passwordForm').addEventListener('submit', async event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const submit = form.querySelector('button[type="submit"]');
+      const status = document.getElementById('passwordStatus');
+      submit.disabled = true;
+      status.className = 'project-meta';
+      status.textContent = '';
+      try {
+        const response = await fetch('/api/password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(Object.fromEntries(new FormData(form)))
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Unable to change your password.');
+        form.reset();
+        status.textContent = result.message;
+      } catch (error) {
+        status.className = 'auth-error';
+        status.textContent = error.message;
+      } finally {
+        submit.disabled = false;
+      }
+    });
+
+    loadProfile().catch(error => {
+      const status = document.getElementById('profileStatus');
+      status.className = 'auth-error';
+      status.textContent = error.message;
+    });
+    loadActivity().catch(error => {
+      ['myApplications', 'myProjects'].forEach(id => {
+        const container = document.getElementById(id);
+        container.replaceChildren();
+        const message = document.createElement('p');
+        message.className = 'card auth-error empty-activity';
+        message.textContent = error.message;
+        container.appendChild(message);
+      });
+    });
+  </script>
+</body>
+</html>

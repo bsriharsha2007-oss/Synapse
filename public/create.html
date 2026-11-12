@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Post a Project - Synapse</title>
+  <script>try { document.documentElement.dataset.theme = localStorage.getItem('synapse-theme') === 'dark' ? 'dark' : 'light'; } catch (error) {}</script>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/js/app.js" defer></script>
+</head>
+<body>
+  <nav class="navbar">
+    <div class="logo">SYNAPSE</div>
+    <div class="nav-links">
+      <a href="/index.html">Discover Projects</a>
+      <a href="/create.html">+ Post Project</a>
+      <a href="/profile.html">My Activity</a>
+      <a href="/admin.html">Faculty Portal</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="card" style="max-width: 700px; margin: 0 auto;">
+      <h2 style="margin-bottom: 1.5rem;">Create a Project & Define Vacancies</h2>
+      
+      <form id="createProjectForm">
+        <div class="form-group">
+          <label for="title">Project title</label>
+          <input type="text" id="title" maxlength="120" required placeholder="e.g. Distributed Uptime Probe Engine">
+        </div>
+
+        <div class="form-group">
+          <label for="description">Problem statement & vision</label>
+          <textarea id="description" rows="3" maxlength="3000" required placeholder="Describe what the team will build and why it matters."></textarea>
+        </div>
+
+        <div class="form-group">
+          <label for="event_tag">Course or event</label>
+          <input type="text" id="event_tag" maxlength="120" required value="Web Tech Course Project" placeholder="e.g. Smart India Hackathon 2026">
+        </div>
+
+        <div class="form-group">
+          <label for="track">Team intent track</label>
+          <select id="track">
+            <option value="Growth">Growth (Learning-focused, friendly for beginners)</option>
+            <option value="Competitive">Competitive (Aiming for top 3, strict commits)</option>
+          </select>
+        </div>
+
+        <hr style="margin: 1.5rem 0; border: none; border-top: 1px solid var(--border);">
+
+        <label style="margin-bottom: 0.5rem;">Needed role vacancies</label>
+        <p style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 1rem;">
+          Define exactly who you need to avoid four people with the same skill.
+        </p>
+
+        <div id="rolesList">
+          <div class="card role-card">
+            <div class="form-group">
+              <label for="roleTitle1">Role title</label>
+              <input id="roleTitle1" type="text" class="role-title" maxlength="100" required placeholder="e.g. Frontend & UI/UX">
+            </div>
+            <div class="form-group">
+              <label for="roleSkills1">Required skills</label>
+              <input id="roleSkills1" type="text" class="role-skills" maxlength="300" required placeholder="e.g. CSS Grid, Responsive Design, Figma">
+            </div>
+          </div>
+        </div>
+
+        <button type="button" class="btn-secondary" id="addRoleButton" style="margin-bottom: 1.5rem;">+ Add another role</button>
+        <br>
+        <button type="submit" class="btn-primary" style="width: 100%; padding: 0.8rem;">Publish Project & Open Applications</button>
+      </form>
+      <p id="createStatus" class="project-meta" role="status" aria-live="polite"></p>
+    </div>
+  </div>
+
+  <script>
+    const rolesList = document.getElementById('rolesList');
+    const addRoleButton = document.getElementById('addRoleButton');
+    let roleSequence = 1;
+
+    function addRoleSlot() {
+      if (rolesList.children.length >= 12) return;
+      const card = document.createElement('div');
+      card.className = 'card role-card';
+      roleSequence += 1;
+      const titleGroup = document.createElement('div');
+      titleGroup.className = 'form-group';
+      const titleLabel = document.createElement('label');
+      titleLabel.htmlFor = `roleTitle${roleSequence}`;
+      titleLabel.textContent = 'Role title';
+      const titleInput = document.createElement('input');
+      titleInput.id = `roleTitle${roleSequence}`;
+      titleInput.type = 'text';
+      titleInput.className = 'role-title';
+      titleInput.maxLength = 100;
+      titleInput.required = true;
+      titleInput.placeholder = 'e.g. Backend & REST APIs';
+      titleGroup.append(titleLabel, titleInput);
+      const skillsGroup = document.createElement('div');
+      skillsGroup.className = 'form-group';
+      const skillsLabel = document.createElement('label');
+      skillsLabel.htmlFor = `roleSkills${roleSequence}`;
+      skillsLabel.textContent = 'Required skills';
+      const skillsInput = document.createElement('input');
+      skillsInput.id = `roleSkills${roleSequence}`;
+      skillsInput.type = 'text';
+      skillsInput.className = 'role-skills';
+      skillsInput.maxLength = 300;
+      skillsInput.required = true;
+      skillsInput.placeholder = 'e.g. Node.js, Express, SQL';
+      skillsGroup.append(skillsLabel, skillsInput);
+      const removeButton = document.createElement('button');
+      removeButton.type = 'button';
+      removeButton.className = 'btn-secondary remove-role';
+      removeButton.textContent = 'Remove role';
+      removeButton.addEventListener('click', () => {
+        card.remove();
+        addRoleButton.disabled = false;
+      });
+      card.append(titleGroup, skillsGroup, removeButton);
+      rolesList.appendChild(card);
+      if (rolesList.children.length >= 12) addRoleButton.disabled = true;
+    }
+
+    addRoleButton.addEventListener('click', addRoleSlot);
+
+    function showCreateStatus(message, isError = false) {
+      const status = document.getElementById('createStatus');
+      status.className = isError ? 'auth-error' : 'project-meta';
+      status.textContent = message;
+    }
+
+    document.getElementById('createProjectForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.currentTarget;
+      const submit = form.querySelector('button[type="submit"]');
+      const roles = [...document.querySelectorAll('.role-title')].map((input, i) => ({
+        role_title: input.value,
+        required_skills: document.querySelectorAll('.role-skills')[i].value
+      }));
+      submit.disabled = true;
+      showCreateStatus('');
+      try {
+        const res = await fetch('/api/projects', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: document.getElementById('title').value,
+            description: document.getElementById('description').value,
+            event_tag: document.getElementById('event_tag').value,
+            track: document.getElementById('track').value,
+            roles
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Unable to publish this project.');
+        showCreateStatus('Project and role vacancies published. Redirecting to projects...');
+        window.setTimeout(() => { window.location.href = '/index.html'; }, 500);
+      } catch (error) {
+        showCreateStatus(error.message, true);
+      } finally {
+        submit.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

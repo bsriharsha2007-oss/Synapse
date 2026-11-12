@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Faculty Portal - Synapse</title>
+  <script>try { document.documentElement.dataset.theme = localStorage.getItem('synapse-theme') === 'dark' ? 'dark' : 'light'; } catch (error) {}</script>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/js/app.js" defer></script>
+</head>
+<body>
+  <nav class="navbar">
+    <div class="logo">SYNAPSE</div>
+    <div class="nav-links">
+      <a href="/index.html">Discover Projects</a>
+      <a href="/create.html">+ Post Project</a>
+      <a href="/profile.html">My Activity</a>
+      <a href="/admin.html">Faculty Portal</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="card">
+      <span class="eyebrow">Faculty workspace</span>
+      <h1>Campus team overview</h1>
+      <p class="project-meta admin-intro">
+        Review projects and role status by course or event. Export a consolidated roster for grading and coordination.
+      </p>
+
+      <a class="btn-primary" href="/api/admin/export-roster">
+        Download master roster (CSV)
+      </a>
+    </div>
+
+    <p id="adminStatus" class="project-meta" role="status" aria-live="polite">Loading event overview…</p>
+
+    <section class="admin-metrics" aria-label="Campus project metrics">
+      <article class="card admin-metric"><span>Projects with openings</span><strong id="openProjectCount">—</strong></article>
+      <article class="card admin-metric"><span>Fully staffed projects</span><strong id="staffedProjectCount">—</strong></article>
+      <article class="card admin-metric"><span>Open roles</span><strong id="openRoleCount">—</strong></article>
+      <article class="card admin-metric"><span>Filled roles</span><strong id="filledRoleCount">—</strong></article>
+    </section>
+
+    <section class="admin-section">
+      <h2>Event & course status <span class="admin-hint">Select an event to filter the project roster</span></h2>
+      <div id="eventOverview" class="event-overview"></div>
+    </section>
+
+    <section class="admin-section">
+      <h2>Project roster</h2>
+      <div class="admin-filters">
+        <label>
+          <span class="sr-only">Filter projects by course or event</span>
+          <select id="filterEvent"><option value="">All courses & events</option></select>
+        </label>
+        <label>
+          <span class="sr-only">Filter by staffing status</span>
+          <select id="filterStaffing">
+            <option value="open">Hide fully staffed projects</option>
+            <option value="all">Show all projects</option>
+            <option value="filled">Show fully staffed only</option>
+          </select>
+        </label>
+        <label class="admin-search">
+          <span class="sr-only">Search projects</span>
+          <input id="projectSearch" type="search" placeholder="Search projects or team leads">
+        </label>
+        <button id="clearAdminFilters" class="btn-secondary" type="button">Clear filters</button>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr><th>Course / event</th><th>Project</th><th>Track</th><th>Team lead</th><th>Roles filled</th><th>Staffing</th><th>Details</th></tr>
+          </thead>
+          <tbody id="projectRows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="admin-section card">
+      <h2>Student account recovery</h2>
+      <p class="project-meta">Set a temporary password for a student account, for example after moving existing accounts to PHP. Share it privately and have the student change it after signing in.</p>
+      <form id="accountRecoveryForm" class="admin-filters">
+        <label>
+          <span class="sr-only">Student University ID</span>
+          <input name="university_id" required maxlength="64" placeholder="Student University ID">
+        </label>
+        <label>
+          <span class="sr-only">Temporary password</span>
+          <input name="new_password" type="password" required minlength="10" maxlength="128" placeholder="Temporary password (10+ characters)">
+        </label>
+        <button class="btn-secondary" type="submit">Set temporary password</button>
+      </form>
+      <p id="accountRecoveryStatus" class="project-meta" role="status" aria-live="polite"></p>
+    </section>
+  </div>
+
+  <script>
+    let allProjects = [];
+
+    function cell(row, value) {
+      const td = document.createElement('td');
+      td.textContent = value == null ? '—' : String(value);
+      row.appendChild(td);
+      return td;
+    }
+
+    function isFullyStaffed(project) {
+      return Number(project.role_count) > 0 &&
+        Number(project.filled_count) === Number(project.role_count);
+    }
+
+    function renderProjectRows() {
+      const eventTag = document.getElementById('filterEvent').value;
+      const staffing = document.getElementById('filterStaffing').value;
+      const search = document.getElementById('projectSearch').value.trim().toLowerCase();
+      document.querySelectorAll('.event-filter-card').forEach(card => {
+        card.setAttribute('aria-pressed', String(card.dataset.eventTag === eventTag && Boolean(eventTag)));
+      });
+      const filtered = allProjects.filter(project => {
+        const fullyStaffed = isFullyStaffed(project);
+        const searchable = `${project.title} ${project.event_tag} ${project.track} ${project.leader_name}`.toLowerCase();
+        return (!eventTag || project.event_tag === eventTag) &&
+          (staffing === 'all' || (staffing === 'filled' ? fullyStaffed : !fullyStaffed)) &&
+          (!search || searchable.includes(search));
+      });
+
+      const rows = document.getElementById('projectRows');
+      rows.replaceChildren();
+      if (!filtered.length) {
+        const row = document.createElement('tr');
+        const empty = cell(row, 'No projects match these filters.');
+        empty.colSpan = 7;
+        rows.appendChild(row);
+      }
+
+      filtered.forEach(project => {
+        const row = document.createElement('tr');
+        cell(row, project.event_tag);
+        cell(row, project.title);
+        cell(row, project.track);
+        cell(row, project.leader_name);
+        cell(row, `${Number(project.filled_count) || 0} / ${Number(project.role_count) || 0} filled · ${Number(project.open_count) || 0} open`);
+        const statusCell = cell(row, '');
+        const badge = document.createElement('span');
+        const fullyStaffed = isFullyStaffed(project);
+        badge.className = `activity-status ${fullyStaffed ? 'status-accepted' : 'staffing-open'}`;
+        badge.textContent = fullyStaffed ? 'Fully staffed' : 'Open roles';
+        statusCell.appendChild(badge);
+        const details = cell(row, '');
+        const link = document.createElement('a');
+        link.className = 'btn-secondary admin-detail-link';
+        link.href = `/project.html?id=${encodeURIComponent(project.id)}`;
+        link.textContent = 'View project';
+        details.appendChild(link);
+        rows.appendChild(row);
+      });
+
+      const eventCount = new Set(filtered.map(project => project.event_tag)).size;
+      document.getElementById('adminStatus').textContent =
+        `Showing ${filtered.length} of ${allProjects.length} projects across ${eventCount} event${eventCount === 1 ? '' : 's'}.`;
+    }
+
+    async function loadAdminOverview() {
+      const status = document.getElementById('adminStatus');
+      try {
+        const response = await fetch('/api/admin/overview');
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Unable to load the coordinator overview.');
+
+        const overview = document.getElementById('eventOverview');
+        overview.replaceChildren();
+        const eventFilter = document.getElementById('filterEvent');
+        eventFilter.replaceChildren(new Option('All courses & events', ''));
+        if (!data.events.length) {
+          const empty = document.createElement('p');
+          empty.className = 'card project-meta';
+          empty.textContent = 'No projects have been posted yet.';
+          overview.appendChild(empty);
+        }
+        data.events.forEach(event => {
+          eventFilter.add(new Option(event.event_tag, event.event_tag));
+          const card = document.createElement('button');
+          card.type = 'button';
+          card.className = 'card event-card event-filter-card';
+          card.dataset.eventTag = event.event_tag;
+          card.setAttribute('aria-pressed', 'false');
+          const heading = document.createElement('h3');
+          heading.textContent = event.event_tag;
+          card.appendChild(heading);
+          const metrics = document.createElement('p');
+          const projectCount = Number(event.project_count);
+          metrics.textContent = `${projectCount} project${projectCount === 1 ? '' : 's'} · ${event.filled_count || 0} / ${event.role_count} roles filled`;
+          card.appendChild(metrics);
+          const openRoles = document.createElement('p');
+          openRoles.className = 'event-open-roles';
+          openRoles.textContent = `${event.open_count || 0} open role${Number(event.open_count) === 1 ? '' : 's'}`;
+          card.appendChild(openRoles);
+          overview.appendChild(card);
+        });
+
+        allProjects = data.projects;
+        const fullyStaffed = allProjects.filter(isFullyStaffed);
+        document.getElementById('openProjectCount').textContent = String(allProjects.length - fullyStaffed.length);
+        document.getElementById('staffedProjectCount').textContent = String(fullyStaffed.length);
+        document.getElementById('openRoleCount').textContent =
+          String(allProjects.reduce((total, project) => total + (Number(project.open_count) || 0), 0));
+        document.getElementById('filledRoleCount').textContent =
+          String(allProjects.reduce((total, project) => total + (Number(project.filled_count) || 0), 0));
+        renderProjectRows();
+      } catch (error) {
+        status.className = 'auth-error';
+        status.textContent = error.message;
+      }
+    }
+
+    document.getElementById('filterEvent').addEventListener('change', renderProjectRows);
+    document.getElementById('filterStaffing').addEventListener('change', renderProjectRows);
+    document.getElementById('projectSearch').addEventListener('input', renderProjectRows);
+    document.getElementById('clearAdminFilters').addEventListener('click', () => {
+      document.getElementById('filterEvent').value = '';
+      document.getElementById('filterStaffing').value = 'open';
+      document.getElementById('projectSearch').value = '';
+      renderProjectRows();
+    });
+    document.getElementById('eventOverview').addEventListener('click', event => {
+      const card = event.target.closest('button[data-event-tag]');
+      if (!card) return;
+      document.getElementById('filterEvent').value = card.dataset.eventTag;
+      renderProjectRows();
+      document.getElementById('projectRows').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+
+    document.getElementById('accountRecoveryForm').addEventListener('submit', async event => {
+      event.preventDefault();
+      const form = event.currentTarget;
+      const submit = form.querySelector('button[type="submit"]');
+      const status = document.getElementById('accountRecoveryStatus');
+      submit.disabled = true;
+      status.className = 'project-meta';
+      status.textContent = '';
+      try {
+        const response = await fetch('/api/admin/users/reset-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(Object.fromEntries(new FormData(form)))
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Unable to reset the student password.');
+        form.reset();
+        status.textContent = result.message;
+      } catch (error) {
+        status.className = 'auth-error';
+        status.textContent = error.message;
+      } finally {
+        submit.disabled = false;
+      }
+    });
+
+    loadAdminOverview();
+  </script>
+</body>
+</html>

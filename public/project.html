@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Project Details - Synapse</title>
+  <script>try { document.documentElement.dataset.theme = localStorage.getItem('synapse-theme') === 'dark' ? 'dark' : 'light'; } catch (error) {}</script>
+  <link rel="stylesheet" href="/css/style.css">
+  <script src="/js/app.js" defer></script>
+</head>
+<body>
+  <nav class="navbar">
+    <div class="logo">SYNAPSE</div>
+    <div class="nav-links">
+      <a href="/index.html">Discover Projects</a>
+      <a href="/create.html">+ Post Project</a>
+      <a href="/profile.html">My Activity</a>
+    </div>
+  </nav>
+
+  <div class="container">
+    <div id="projectInfo"></div>
+
+    <div class="card" style="margin-top: 2rem;">
+      <h3>Available roles</h3>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+        Choose an open role that suits you, then apply with an introduction. Resume and portfolio links are optional.
+      </p>
+      <p id="projectStatus" class="project-meta" role="status" aria-live="polite"></p>
+      <a id="activityLink" class="btn-secondary activity-return-link" href="/profile.html" hidden>Track your application in My Activity</a>
+      <div id="vacanciesList"></div>
+    </div>
+
+    <div class="card" id="applicationsContainer" style="display: none; margin-top: 2rem;">
+      <h3>Pending Applications (Leader Review)</h3>
+      <div id="applicationsList"></div>
+    </div>
+  </div>
+
+  <!-- Apply Modal -->
+  <div id="applyModal" class="modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="modalRoleTitle">
+    <div class="modal">
+      <h3 style="margin-bottom: 0.5rem;" id="modalRoleTitle">Apply for Role</h3>
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+        Introduce what you can contribute. Add a PDF resume or a portfolio link if you have one.
+      </p>
+      <form id="applyForm">
+        <input type="hidden" id="modalVacancyId" name="vacancy_id">
+        <div class="form-group">
+          <label for="modalPitch">Introduction</label>
+          <textarea id="modalPitch" name="pitch_note" rows="4" maxlength="1000" required placeholder="Share what you know, what you would like to learn, and how you can help this project."></textarea>
+        </div>
+        <div class="form-group">
+          <label for="modalResume">Resume (optional PDF, up to 5 MB)</label>
+          <input type="file" id="modalResume" name="resume" accept="application/pdf,.pdf">
+        </div>
+        <div class="form-group">
+          <label for="modalProof">Resume or portfolio link (optional)</label>
+          <input type="url" id="modalProof" name="proof_url" maxlength="2048" placeholder="https://github.com/your-username">
+          <small class="form-hint">You can apply with just your introduction if you do not have a resume or link.</small>
+        </div>
+        <div style="display:flex; justify-content: flex-end; gap: 0.5rem;">
+          <button type="button" class="btn-secondary" id="cancelApplication">Cancel</button>
+          <button type="submit" class="btn-primary">Send application</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const projectId = params.get('id');
+    const projectInfo = document.getElementById('projectInfo');
+    const vacanciesList = document.getElementById('vacanciesList');
+    const applicationsList = document.getElementById('applicationsList');
+    const applicationsContainer = document.getElementById('applicationsContainer');
+    const projectStatus = document.getElementById('projectStatus');
+    const activityLink = document.getElementById('activityLink');
+    const applyModal = document.getElementById('applyModal');
+    const applyForm = document.getElementById('applyForm');
+    const applyButton = applyForm.querySelector('button[type="submit"]');
+
+    function element(tag, className, text) {
+      const node = document.createElement(tag);
+      if (className) node.className = className;
+      if (text !== undefined) node.textContent = text;
+      return node;
+    }
+
+    function showError(message) {
+      projectInfo.replaceChildren();
+      projectInfo.appendChild(element('p', 'card auth-error', message));
+    }
+
+    function setStatus(message, isError = false) {
+      projectStatus.className = isError ? 'auth-error' : 'project-meta';
+      projectStatus.textContent = message;
+      if (isError) activityLink.hidden = true;
+    }
+
+    function safeHttpUrl(value) {
+      try {
+        const url = new URL(value);
+        return ['http:', 'https:'].includes(url.protocol) ? url.href : null;
+      } catch (error) {
+        return null;
+      }
+    }
+
+    async function loadData() {
+      if (!projectId) {
+        showError('Project not found.');
+        return;
+      }
+
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}`);
+      const data = await res.json();
+      if (!res.ok) {
+        showError(data.error || 'Unable to load this project.');
+        return;
+      }
+
+      const meRes = await fetch('/api/me');
+      const currentUser = await meRes.json();
+      if (!meRes.ok) {
+        showError(currentUser.error || 'Unable to load your account.');
+        return;
+      }
+
+      const isLeader = currentUser.id === data.project.leader_id;
+      projectInfo.replaceChildren();
+      const projectCard = element('section', 'card project-detail-card');
+      const header = element('div', 'card-header');
+      const projectHeading = element('div');
+      projectHeading.appendChild(element('h1', 'card-title', data.project.title));
+      projectHeading.appendChild(element('p', 'project-meta', `${data.project.event_tag} · Led by ${data.project.leader_name}`));
+      header.appendChild(projectHeading);
+      header.appendChild(element('span', `badge ${data.project.track === 'Competitive' ? 'badge-competitive' : 'badge-growth'}`, data.project.track));
+      projectCard.appendChild(header);
+      projectCard.appendChild(element('p', 'project-description', data.project.description));
+      if (isLeader) {
+        const ownerActions = element('div', 'project-owner-actions');
+        const deleteButton = element('button', 'btn-danger', 'Delete project');
+        deleteButton.type = 'button';
+        deleteButton.dataset.action = 'delete-project';
+        deleteButton.dataset.projectId = data.project.id;
+        ownerActions.appendChild(deleteButton);
+        projectCard.appendChild(ownerActions);
+      }
+      if (data.project.leader_email) {
+        const contact = element('p', 'contact-unlocked', `Team contact: ${data.project.leader_email}`);
+        projectCard.appendChild(contact);
+      } else {
+        projectCard.appendChild(element('p', 'project-meta', 'Team contact details unlock after the team lead accepts your application.'));
+      }
+      projectInfo.appendChild(projectCard);
+
+      vacanciesList.replaceChildren();
+      data.vacancies.forEach(vacancy => {
+        const row = element('article', `vacancy-row${vacancy.status === 'Open' && !isLeader && !data.is_member ? ' vacancy-selectable' : ''}`);
+        const details = element('div');
+        details.appendChild(element('h4', '', vacancy.role_title));
+        details.appendChild(element('p', 'project-meta', `Skills: ${vacancy.required_skills}`));
+        details.appendChild(element('span', `slot-tag ${vacancy.status === 'Open' ? 'open' : 'filled'}`, vacancy.status));
+        row.appendChild(details);
+        const existingApplication = data.my_applications.find(application => application.vacancy_id === vacancy.id);
+        if (vacancy.status === 'Open' && !isLeader && !data.is_member && !existingApplication) {
+          const button = element('button', 'btn-primary role-apply-action', 'Apply for this role');
+          button.type = 'button';
+          button.dataset.action = 'apply';
+          button.dataset.vacancyId = vacancy.id;
+          button.dataset.roleTitle = vacancy.role_title;
+          row.appendChild(button);
+        }
+        if (existingApplication) {
+          row.appendChild(element(
+            'span',
+            `activity-status status-${existingApplication.status.toLowerCase()}`,
+            `Your application · ${existingApplication.status}`
+          ));
+        }
+        vacanciesList.appendChild(row);
+      });
+
+      if (currentUser.id === data.project.leader_id) {
+        applicationsContainer.style.display = 'block';
+        renderApplications(data.applications);
+      } else {
+        applicationsContainer.style.display = 'none';
+      }
+
+      const requestedRoleId = params.get('role');
+      if (requestedRoleId) {
+        const requestedRole = data.vacancies.find(vacancy => vacancy.id === requestedRoleId);
+        if (!requestedRole || requestedRole.status !== 'Open') {
+          setStatus('That role is no longer available. Review the current open roles below.', true);
+        } else if (isLeader) {
+          setStatus('You published this project. Use the review panel below to manage applicants.');
+        } else if (data.is_member) {
+          setStatus('You are already on a team for this event.');
+        } else if (data.my_applications.some(application => application.vacancy_id === requestedRoleId)) {
+          setStatus('You have already applied for this role. Track its decision in My Activity.');
+        } else {
+          openModal(requestedRole.id, requestedRole.role_title);
+        }
+      }
+    }
+
+    function renderApplications(applications) {
+      applicationsList.replaceChildren();
+      if (!applications.length) {
+        applicationsList.appendChild(element('p', 'project-meta', 'No applications received yet.'));
+        return;
+      }
+      applications.forEach(application => {
+        const card = element('article', 'application-card');
+        const header = element('div', 'application-header');
+        header.appendChild(element('strong', '', application.applicant_name));
+        header.appendChild(element('span', 'slot-tag', application.status));
+        card.appendChild(header);
+        card.appendChild(element('p', '', application.pitch_note));
+        card.appendChild(element('p', 'project-meta', `Skills: ${application.applicant_skills || 'Not added yet'}`));
+        const proofUrl = safeHttpUrl(application.proof_url);
+        if (proofUrl) {
+          const proof = element('a', 'proof-link', 'Open resume or portfolio link');
+          proof.href = proofUrl;
+          proof.target = '_blank';
+          proof.rel = 'noopener noreferrer';
+          card.appendChild(proof);
+        } else if (application.proof_url) {
+          card.appendChild(element('p', 'project-meta', 'The submitted link is not valid.'));
+        }
+        if (application.has_resume) {
+          const resume = element('a', 'proof-link', 'Download PDF resume');
+          resume.href = `/api/applications/${encodeURIComponent(application.id)}/resume`;
+          resume.setAttribute('download', '');
+          card.appendChild(resume);
+        } else if (!proofUrl) {
+          card.appendChild(element('p', 'project-meta', 'No resume attached; introduction only.'));
+        }
+        if (application.applicant_email) {
+          card.appendChild(element('p', 'contact-unlocked', `Accepted teammate: ${application.applicant_email}`));
+        }
+        if (application.status === 'Pending') {
+          const actions = element('div', 'application-actions');
+          [['Accepted', 'Accept & lock role', 'btn-primary'], ['Declined', 'Decline', 'btn-secondary']].forEach(([decision, label, className]) => {
+            const button = element('button', className, label);
+            button.type = 'button';
+            button.dataset.action = 'decision';
+            button.dataset.applicationId = application.id;
+            button.dataset.decision = decision;
+            actions.appendChild(button);
+          });
+          card.appendChild(actions);
+        }
+        applicationsList.appendChild(card);
+      });
+    }
+
+    function openModal(id, title) {
+      document.getElementById('modalVacancyId').value = id;
+      document.getElementById('modalRoleTitle').textContent = `Apply for: ${title}`;
+      applyModal.style.display = 'flex';
+      document.getElementById('modalPitch').focus();
+    }
+
+    function closeModal() {
+      applyModal.style.display = 'none';
+    }
+
+    document.getElementById('cancelApplication').addEventListener('click', closeModal);
+    applyModal.addEventListener('click', event => {
+      if (event.target === applyModal) closeModal();
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape' && applyModal.style.display === 'flex') closeModal();
+    });
+
+    document.addEventListener('click', async event => {
+      const button = event.target.closest('button[data-action]');
+      if (!button) return;
+      if (button.dataset.action === 'apply') {
+        openModal(button.dataset.vacancyId, button.dataset.roleTitle);
+        return;
+      }
+      if (button.dataset.action === 'delete-project') {
+        const confirmed = window.confirm(
+          'Delete this project? Its roles, applications, attached resumes, and team membership records will also be permanently deleted.'
+        );
+        if (!confirmed) return;
+        button.disabled = true;
+        try {
+          const response = await fetch(`/api/projects/${encodeURIComponent(button.dataset.projectId)}`, {
+            method: 'DELETE'
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || 'Unable to delete this project.');
+          window.location.assign('/profile.html');
+        } catch (error) {
+          setStatus(error.message, true);
+          button.disabled = false;
+        }
+        return;
+      }
+      if (button.dataset.action === 'decision') {
+        button.disabled = true;
+        try {
+          const response = await fetch('/api/applications/decision', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ application_id: button.dataset.applicationId, decision: button.dataset.decision })
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || 'Unable to review this application.');
+          setStatus(result.message);
+          await loadData();
+        } catch (error) {
+          setStatus(error.message, true);
+          button.disabled = false;
+        }
+      }
+    });
+
+    applyForm.addEventListener('submit', async event => {
+      event.preventDefault();
+      applyButton.disabled = true;
+      setStatus('');
+      try {
+        const formData = new FormData(applyForm);
+        const response = await fetch('/api/applications', {
+          method: 'POST',
+          body: formData
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Unable to send your application.');
+        applyForm.reset();
+        closeModal();
+        setStatus(result.message);
+        activityLink.hidden = false;
+        await loadData();
+      } catch (error) {
+        setStatus(error.message, true);
+      } finally {
+        applyButton.disabled = false;
+      }
+    });
+
+    loadData().catch(error => {
+      showError(error.message || 'Unable to load this project.');
+    });
+  </script>
+</body>
+</html>
