@@ -2,19 +2,19 @@
 
 ## Run locally
 
-Install PHP 8.1 or later with the `PDO_SQLITE` and `fileinfo` extensions enabled. Start the local development server with:
+Install PHP 8.3 with the `PDO_SQLITE` and `fileinfo` extensions enabled. Start the local development server with:
 
 ```powershell
 php -d upload_max_filesize=6M -d post_max_size=8M -S 127.0.0.1:8000 -t public public/router.php
 ```
 
-Open `http://127.0.0.1:8000`. The PHP backend uses the local SQLite database `synapse.db` and has no PHP package dependencies.
+Open `http://127.0.0.1:8000`. The PHP backend uses the local SQLite database `synapse.db` and has no PHP package dependencies. A new empty database is seeded with three campus projects, four sample student accounts, open roles, and one filled role. Set `SYNAPSE_DEMO_PASSWORD` before first startup if you need to sign in as a sample student; otherwise a random password is generated and only its hash is stored.
 
 Students register with their name, college email, University ID, and a password of at least 10 characters. Account details and projects are stored in SQLite; passwords use PHP's password hashing. Registration always grants the student role. Administrator access is provisioned only from server environment variables. Email addresses are used for team contact after acceptance; this demo does not perform college-domain or email ownership verification.
 
-Project leads define up to 12 role vacancies. Applicants can select an open role and submit an introduction; a PDF resume (up to 5 MB) and/or an `http`/`https` resume or portfolio link are optional. Resume downloads are private to the applicant and project lead. The My Activity page tracks both submitted applications and projects the user posted, including pending decisions. Accepting an applicant fills the role, declines competing applications, unlocks team contact details, and registers the student to one team for that course or event. Project leads can delete their own projects from the project page or My Activity; deleting a project also permanently deletes its roles, applications, resumes, and team membership records. The public discovery feed hides projects once all their roles are filled. Faculty users can inspect all projects, filter to open or fully staffed projects, search and filter by event, and export the master roster as CSV.
+Project leads define up to 12 role vacancies. Applicants can select an open role and submit an introduction of exactly two sentences; a PDF resume (up to 5 MB) and/or an `http`/`https` resume or portfolio link are optional. Resume downloads are private to the applicant and project lead. The My Activity page tracks both submitted applications and projects the user posted, including pending decisions. Accepting an applicant fills the role, declines competing applications, unlocks team contact details, and registers the student to one team for that course or event. Project leads can delete their own projects from the project page or My Activity; deleting a project also permanently deletes its roles, applications, resumes, and team membership records. The public discovery feed defaults to recruiting projects and can include completed teams. Faculty users can review event completion, projects, full team rosters, and student placements; moderate project and member records; and export master and unassigned-student rosters as CSV.
 
-Run the end-to-end account, password, application, access-control, and roster checks with `npm test`. Tests use a temporary SQLite database and require PHP to be available on `PATH`.
+Run the end-to-end account, password, application, access-control, faculty moderation, and roster checks with `npm test`. Tests use a temporary SQLite database and require PHP to be available on `PATH`.
 
 ## Administrator account
 

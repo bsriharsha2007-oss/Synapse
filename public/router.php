@@ -83,6 +83,26 @@ function validUrl(string $value): bool
         !isset($parts['user']) && !isset($parts['pass']);
 }
 
+function csvEscapeCell(mixed $value): string
+{
+    $text = (string)($value ?? '');
+    if (preg_match('/^[\s\xEF\xBB\xBF]*[=+\-@]/', $text)) {
+        $text = "'" . $text;
+    }
+    return '"' . str_replace('"', '""', $text) . '"';
+}
+
+function hasTwoSentences(string $text): bool
+{
+    $text = str_ireplace(
+        ['e.g.', 'i.e.', 'Node.js', 'Next.js', 'Vue.js', 'Dr.', 'Mr.', 'Ms.'],
+        ['eg', 'ie', 'Nodejs', 'Nextjs', 'Vuejs', 'Dr', 'Mr', 'Ms'],
+        $text
+    );
+    preg_match_all('/[.!?]+["\')\]]*(?=\s|$)/u', $text, $matches);
+    return count($matches[0]) === 2;
+}
+
 function hashPassword(string $password): string
 {
     $algorithm = defined('PASSWORD_ARGON2ID') ? PASSWORD_ARGON2ID : PASSWORD_DEFAULT;
@@ -167,6 +187,26 @@ $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
 $data = body();
 $user = null;
 
+$isPublicStats = $path === '/api/public-stats' && $method === 'GET';
+if ($isPublicStats) {
+    $db = database();
+    $activeProjects = $db->prepare("SELECT COUNT(DISTINCT p.id) FROM projects p
+        JOIN vacancies v ON v.project_id = p.id WHERE v.status = 'Open'");
+    $activeProjects->execute();
+    $openVacancies = $db->prepare("SELECT COUNT(*) FROM vacancies WHERE status = 'Open'");
+    $openVacancies->execute();
+    $completedTeams = $db->prepare("SELECT COUNT(*) FROM (
+        SELECT p.id FROM projects p LEFT JOIN vacancies v ON v.project_id = p.id
+        GROUP BY p.id HAVING SUM(CASE WHEN v.status = 'Open' THEN 1 ELSE 0 END) = 0
+    )");
+    $completedTeams->execute();
+    respond(200, [
+        'active_project_count' => (int)$activeProjects->fetchColumn(),
+        'open_vacancy_count' => (int)$openVacancies->fetchColumn(),
+        'completed_team_count' => (int)$completedTeams->fetchColumn(),
+    ]);
+}
+
 if ($path === '/api/auth/register' && $method === 'POST') {
     $name = trim((string)($data['name'] ?? ''));
     $email = strtolower(trim((string)($data['email'] ?? '')));
@@ -230,7 +270,7 @@ if ($path === '/api/auth/session' && $method === 'GET') {
 $publicStatic = in_array($path, ['/login.html', '/css/style.css', '/js/app.js'], true);
 $page = in_array($path, ['/', '/index.html', '/create.html', '/profile.html', '/project.html', '/admin.html'], true);
 $api = str_starts_with($path, '/api/');
-if (($page && !$publicStatic) || ($api && !str_starts_with($path, '/api/auth/'))) {
+if (($page && !$publicStatic) || ($api && !str_starts_with($path, '/api/auth/') && !$isPublicStats)) {
     $user = currentUser();
     if (!$user) {
         if ($api) {
@@ -304,11 +344,12 @@ if ($path === '/api/password' && $method === 'POST') {
 
 if ($path === '/api/projects' && $method === 'GET') {
     $query = database()->prepare("SELECT p.*, u.name AS leader_name FROM projects p JOIN users u ON p.leader_id = u.id
-        WHERE EXISTS (SELECT 1 FROM vacancies v WHERE v.project_id = p.id AND v.status = 'Open')
+        WHERE (? = '1' OR EXISTS (SELECT 1 FROM vacancies v WHERE v.project_id = p.id AND v.status = 'Open'))
         AND (? = '' OR p.track = ?) AND (? = '' OR p.event_tag = ?) ORDER BY p.created_at DESC");
     $track = trim((string)($_GET['track'] ?? ''));
     $event = trim((string)($_GET['event_tag'] ?? ''));
-    $query->execute([$track, $track, $event, $event]);
+    $includeCompleted = ($_GET['include_completed'] ?? '') === '1';
+    $query->execute([$includeCompleted ? '1' : '0', $track, $track, $event, $event]);
     $projects = $query->fetchAll();
     $vacancies = database()->query('SELECT * FROM vacancies')->fetchAll();
     $members = database()->prepare('SELECT project_id FROM project_members WHERE user_id = ?');
@@ -486,6 +527,9 @@ if ($path === '/api/applications' && $method === 'POST') {
     if ($vacancyId === '' || $pitch === '' || strlen($pitch) > 1000) {
         fail(400, 'Provide a role and an introduction of up to 1,000 characters.');
     }
+    if (!hasTwoSentences($pitch)) {
+        fail(400, 'Your introduction must contain exactly two sentences.');
+    }
     if ($proof !== '' && !validUrl($proof)) {
         fail(400, 'Resume or portfolio links must use http or https.');
     }
@@ -604,16 +648,165 @@ if ($path === '/api/applications/decision' && $method === 'POST') {
 }
 
 if ($path === '/api/admin/overview' && $method === 'GET') {
-    $events = database()->query("SELECT p.event_tag, COUNT(DISTINCT p.id) AS project_count, COUNT(v.id) AS role_count,
+    $db = database();
+    $projectQuery = $db->prepare("SELECT p.id, p.event_tag, p.title, p.description, p.track, p.created_at,
+        u.id AS leader_id, u.name AS leader_name, u.university_id AS leader_university_id, u.email AS leader_email,
+        COUNT(v.id) AS role_count,
         COALESCE(SUM(CASE WHEN v.status = 'Filled' THEN 1 ELSE 0 END), 0) AS filled_count,
         COALESCE(SUM(CASE WHEN v.status = 'Open' THEN 1 ELSE 0 END), 0) AS open_count
-        FROM projects p LEFT JOIN vacancies v ON v.project_id = p.id GROUP BY p.event_tag ORDER BY p.event_tag")->fetchAll();
-    $projects = database()->query("SELECT p.id, p.event_tag, p.title, p.track, p.created_at, u.name AS leader_name,
-        COUNT(v.id) AS role_count, COALESCE(SUM(CASE WHEN v.status = 'Filled' THEN 1 ELSE 0 END), 0) AS filled_count,
-        COALESCE(SUM(CASE WHEN v.status = 'Open' THEN 1 ELSE 0 END), 0) AS open_count
         FROM projects p JOIN users u ON u.id = p.leader_id LEFT JOIN vacancies v ON v.project_id = p.id
-        GROUP BY p.id ORDER BY p.event_tag, p.created_at DESC")->fetchAll();
-    respond(200, ['events' => $events, 'projects' => $projects]);
+        GROUP BY p.id ORDER BY p.event_tag, p.created_at DESC");
+    $projectQuery->execute();
+    $projects = $projectQuery->fetchAll();
+    $memberQuery = $db->prepare("SELECT pm.project_id, pm.role_title, pm.vacancy_id,
+        u.name, u.university_id, u.email
+        FROM project_members pm JOIN users u ON u.id = pm.user_id ORDER BY pm.assigned_at, u.name");
+    $memberQuery->execute();
+    $membersByProject = [];
+    foreach ($memberQuery->fetchAll() as $member) {
+        $projectId = $member['project_id'];
+        unset($member['project_id']);
+        $membersByProject[$projectId][] = $member;
+    }
+    $eventMap = [];
+    $completeCount = 0;
+    $recruitingCount = 0;
+    foreach ($projects as &$project) {
+        $project['role_count'] = (int)$project['role_count'];
+        $project['filled_count'] = (int)$project['filled_count'];
+        $project['open_count'] = (int)$project['open_count'];
+        $project['completion_status'] = $project['open_count'] === 0 ? 'Complete' : 'Recruiting';
+        $project['members'] = $membersByProject[$project['id']] ?? [];
+        if ($project['completion_status'] === 'Complete') {
+            $completeCount++;
+        } else {
+            $recruitingCount++;
+        }
+        $eventTag = $project['event_tag'];
+        if (!isset($eventMap[$eventTag])) {
+            $eventMap[$eventTag] = [
+                'event_tag' => $eventTag,
+                'total_projects' => 0,
+                'complete_teams_count' => 0,
+                'recruiting_teams_count' => 0,
+                'total_slots' => 0,
+                'filled_slots' => 0,
+                'project_count' => 0,
+                'role_count' => 0,
+                'filled_count' => 0,
+                'open_count' => 0,
+            ];
+        }
+        $eventMap[$eventTag]['total_projects']++;
+        $eventMap[$eventTag]['project_count']++;
+        $eventMap[$eventTag]['total_slots'] += $project['role_count'];
+        $eventMap[$eventTag]['role_count'] += $project['role_count'];
+        $eventMap[$eventTag]['filled_slots'] += $project['filled_count'];
+        $eventMap[$eventTag]['filled_count'] += $project['filled_count'];
+        $eventMap[$eventTag]['open_count'] += $project['open_count'];
+        $eventMap[$eventTag][$project['completion_status'] === 'Complete' ? 'complete_teams_count' : 'recruiting_teams_count']++;
+    }
+    unset($project);
+
+    $studentQuery = $db->prepare("SELECT id, name, university_id, email, skills FROM users
+        WHERE role != 'admin' ORDER BY name, university_id");
+    $studentQuery->execute();
+    $students = $studentQuery->fetchAll();
+    $assignmentQuery = $db->prepare("SELECT pm.user_id, p.id AS project_id, p.title AS project_title,
+        p.event_tag, pm.role_title FROM project_members pm JOIN projects p ON p.id = pm.project_id");
+    $assignmentQuery->execute();
+    $assignments = [];
+    foreach ($assignmentQuery->fetchAll() as $assignment) {
+        $assignments[$assignment['user_id']][] = [
+            'project_id' => $assignment['project_id'],
+            'project_title' => $assignment['project_title'],
+            'event_tag' => $assignment['event_tag'],
+            'role_title' => $assignment['role_title'],
+        ];
+    }
+    $unassignedCount = 0;
+    foreach ($students as &$student) {
+        $student['team_assignments'] = $assignments[$student['id']] ?? [];
+        $student['assignment_status'] = $student['team_assignments'] ? 'Assigned' : 'Unassigned';
+        if ($student['assignment_status'] === 'Unassigned') {
+            $unassignedCount++;
+        }
+        unset($student['id']);
+    }
+    unset($student);
+    $events = array_values($eventMap);
+    respond(200, [
+        'summary' => [
+            'total_events' => count($events),
+            'total_projects' => count($projects),
+            'complete_teams' => $completeCount,
+            'recruiting_teams' => $recruitingCount,
+            'total_registered_students' => count($students),
+            'unassigned_students' => $unassignedCount,
+        ],
+        'events' => $events,
+        'projects' => $projects,
+        'students' => $students,
+    ]);
+}
+
+if ($path === '/api/admin/projects/delete' && $method === 'POST') {
+    $projectId = trim((string)($data['project_id'] ?? ''));
+    if ($projectId === '') {
+        fail(400, 'Choose a project to delete.');
+    }
+    try {
+        transaction(function (PDO $db) use ($projectId): void {
+            $query = $db->prepare('SELECT id FROM projects WHERE id = ?');
+            $query->execute([$projectId]);
+            if (!$query->fetch()) {
+                throw new OutOfBoundsException('Project not found.');
+            }
+            $db->prepare('DELETE FROM projects WHERE id = ?')->execute([$projectId]);
+        });
+        respond(200, ['message' => 'Project, vacancies, memberships, and applications deleted.', 'project_id' => $projectId]);
+    } catch (OutOfBoundsException $error) {
+        fail(404, $error->getMessage());
+    } catch (Throwable $error) {
+        rollbackError($error);
+    }
+}
+
+if ($path === '/api/admin/members/remove' && $method === 'POST') {
+    $vacancyId = trim((string)($data['vacancy_id'] ?? ''));
+    if ($vacancyId === '') {
+        fail(400, 'Choose an assigned member to remove.');
+    }
+    try {
+        transaction(function (PDO $db) use ($vacancyId): void {
+            $query = $db->prepare("SELECT v.id, v.project_id, v.assigned_user_id, v.status
+                FROM vacancies v WHERE v.id = ?");
+            $query->execute([$vacancyId]);
+            $vacancy = $query->fetch();
+            if (!$vacancy) {
+                throw new OutOfBoundsException('Role slot not found.');
+            }
+            if ($vacancy['status'] !== 'Filled' || !$vacancy['assigned_user_id']) {
+                throw new DomainException('That role slot is not currently assigned.');
+            }
+            $db->prepare("DELETE FROM project_members WHERE project_id = ? AND user_id = ? AND vacancy_id = ?")
+                ->execute([$vacancy['project_id'], $vacancy['assigned_user_id'], $vacancyId]);
+            $db->prepare("DELETE FROM applications WHERE vacancy_id = ? AND applicant_id = ? AND status = 'Accepted'")
+                ->execute([$vacancyId, $vacancy['assigned_user_id']]);
+            $update = $db->prepare("UPDATE vacancies SET status = 'Open', assigned_user_id = NULL WHERE id = ? AND status = 'Filled'");
+            $update->execute([$vacancyId]);
+            if ($update->rowCount() !== 1) {
+                throw new LogicException('That role slot changed before the member could be removed.');
+            }
+        });
+        respond(200, ['message' => 'Member removed and role slot reopened.', 'vacancy_id' => $vacancyId]);
+    } catch (OutOfBoundsException $error) {
+        fail(404, $error->getMessage());
+    } catch (LogicException $error) {
+        fail(409, $error->getMessage());
+    } catch (Throwable $error) {
+        rollbackError($error);
+    }
 }
 
 if ($path === '/api/admin/users/reset-password' && $method === 'POST') {
@@ -631,25 +824,37 @@ if ($path === '/api/admin/users/reset-password' && $method === 'POST') {
 }
 
 if ($path === '/api/admin/export-roster' && $method === 'GET') {
-    $rows = database()->query("SELECT p.event_tag, p.title AS project_title, p.track,
+    $query = database()->prepare("SELECT p.event_tag, p.title AS project_title, p.track,
         lead.name AS team_lead, lead.email AS lead_email, v.role_title,
         COALESCE(member.name, 'UNFILLED') AS member_name, COALESCE(member.email, 'N/A') AS member_email
         FROM projects p JOIN users lead ON p.leader_id = lead.id
         LEFT JOIN vacancies v ON p.id = v.project_id LEFT JOIN users member ON v.assigned_user_id = member.id
-        ORDER BY p.event_tag, p.title")->fetchAll();
-    $escape = static function (mixed $value): string {
-        $text = (string)($value ?? '');
-        if (preg_match('/^[\s\xEF\xBB\xBF]*[=+\-@]/', $text)) {
-            $text = "'" . $text;
-        }
-        return '"' . str_replace('"', '""', $text) . '"';
-    };
+        ORDER BY p.event_tag, p.title");
+    $query->execute();
+    $rows = $query->fetchAll();
     header('Content-Type: text/csv; charset=utf-8');
     header('Content-Disposition: attachment; filename="campus_project_roster.csv"');
     $out = fopen('php://output', 'wb');
     fputcsv($out, ['Event', 'Project Title', 'Track', 'Team Lead', 'Lead Email', 'Role', 'Member Name', 'Member Email']);
     foreach ($rows as $row) {
-        fputs($out, implode(',', array_map($escape, array_values($row))) . "\r\n");
+        fputs($out, implode(',', array_map('csvEscapeCell', array_values($row))) . "\r\n");
+    }
+    fclose($out);
+    exit;
+}
+
+if ($path === '/api/admin/export-unassigned' && $method === 'GET') {
+    $query = database()->prepare("SELECT u.name, u.university_id, u.email, u.skills FROM users u
+        WHERE u.role != 'admin' AND NOT EXISTS (
+            SELECT 1 FROM project_members pm WHERE pm.user_id = u.id
+        ) ORDER BY u.name, u.university_id");
+    $query->execute();
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="unassigned_students.csv"');
+    $out = fopen('php://output', 'wb');
+    fputs($out, implode(',', array_map('csvEscapeCell', ['Name', 'University ID', 'Email', 'Skills'])) . "\r\n");
+    foreach ($query->fetchAll() as $row) {
+        fputs($out, implode(',', array_map('csvEscapeCell', array_values($row))) . "\r\n");
     }
     fclose($out);
     exit;

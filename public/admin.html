@@ -4,7 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Faculty Portal - Synapse</title>
-  <script>try { document.documentElement.dataset.theme = localStorage.getItem('synapse-theme') === 'dark' ? 'dark' : 'light'; } catch (error) {}</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
   <script src="/js/app.js" defer></script>
 </head>
@@ -19,146 +21,230 @@
     </div>
   </nav>
 
-  <div class="container">
-    <div class="card">
-      <span class="eyebrow">Faculty workspace</span>
-      <h1>Campus team overview</h1>
-      <p class="project-meta admin-intro">
-        Review projects and role status by course or event. Export a consolidated roster for grading and coordination.
-      </p>
+  <main class="container">
+    <header class="card admin-header">
+      <div>
+        <span class="eyebrow">Faculty workspace</span>
+        <h1>Campus team overview</h1>
+        <p class="project-meta admin-intro">Track event participation, review full team rosters, and manage student placements.</p>
+      </div>
+      <a class="btn-primary" href="/api/admin/export-roster">Download Master Team Roster (CSV)</a>
+    </header>
 
-      <a class="btn-primary" href="/api/admin/export-roster">
-        Download master roster (CSV)
-      </a>
-    </div>
+    <p id="adminStatus" class="project-meta" role="status" aria-live="polite">Loading faculty overview…</p>
 
-    <p id="adminStatus" class="project-meta" role="status" aria-live="polite">Loading event overview…</p>
-
-    <section class="admin-metrics" aria-label="Campus project metrics">
-      <article class="card admin-metric"><span>Projects with openings</span><strong id="openProjectCount">—</strong></article>
-      <article class="card admin-metric"><span>Fully staffed projects</span><strong id="staffedProjectCount">—</strong></article>
-      <article class="card admin-metric"><span>Open roles</span><strong id="openRoleCount">—</strong></article>
-      <article class="card admin-metric"><span>Filled roles</span><strong id="filledRoleCount">—</strong></article>
+    <section class="admin-metrics" aria-label="Campus summary metrics">
+      <article class="card admin-metric"><span>Total events</span><strong id="totalEvents">—</strong></article>
+      <article class="card admin-metric"><span>Total projects</span><strong id="totalProjects">—</strong></article>
+      <article class="card admin-metric"><span>Complete teams</span><strong id="completeTeams">—</strong></article>
+      <article class="card admin-metric"><span>Recruiting teams</span><strong id="recruitingTeams">—</strong></article>
+      <article class="card admin-metric"><span>Registered students</span><strong id="registeredStudents">—</strong></article>
+      <article class="card admin-metric"><span>Unassigned students</span><strong id="unassignedStudents">—</strong></article>
     </section>
 
-    <section class="admin-section">
-      <h2>Event & course status <span class="admin-hint">Select an event to filter the project roster</span></h2>
-      <div id="eventOverview" class="event-overview"></div>
+    <section class="admin-section" aria-labelledby="eventsHeading">
+      <h2 id="eventsHeading">Events &amp; completion tracker</h2>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Event tag</th><th>Projects</th><th>Complete</th><th>Recruiting</th><th>Slots filled</th><th>Total slots</th></tr></thead>
+          <tbody id="eventRows"></tbody>
+        </table>
+      </div>
     </section>
 
-    <section class="admin-section">
-      <h2>Project roster</h2>
+    <section class="admin-section" aria-labelledby="projectsHeading">
+      <h2 id="projectsHeading">Projects &amp; team rosters</h2>
       <div class="admin-filters">
         <label>
-          <span class="sr-only">Filter projects by course or event</span>
-          <select id="filterEvent"><option value="">All courses & events</option></select>
+          <span class="sr-only">Filter projects by event tag</span>
+          <select id="filterEvent"><option value="">All events</option></select>
         </label>
         <label>
-          <span class="sr-only">Filter by staffing status</span>
-          <select id="filterStaffing">
-            <option value="open">Hide fully staffed projects</option>
-            <option value="all">Show all projects</option>
-            <option value="filled">Show fully staffed only</option>
+          <span class="sr-only">Filter projects by completion status</span>
+          <select id="filterStatus">
+            <option value="all">All statuses</option>
+            <option value="Recruiting">Recruiting</option>
+            <option value="Complete">Complete</option>
           </select>
         </label>
         <label class="admin-search">
-          <span class="sr-only">Search projects</span>
+          <span class="sr-only">Search projects or team leads</span>
           <input id="projectSearch" type="search" placeholder="Search projects or team leads">
         </label>
         <button id="clearAdminFilters" class="btn-secondary" type="button">Clear filters</button>
       </div>
       <div class="table-wrap">
         <table class="data-table">
-          <thead>
-            <tr><th>Course / event</th><th>Project</th><th>Track</th><th>Team lead</th><th>Roles filled</th><th>Staffing</th><th>Details</th></tr>
-          </thead>
+          <thead><tr><th>Event / project</th><th>Track</th><th>Team lead</th><th>Slots</th><th>Status</th><th>Full roster &amp; moderation</th></tr></thead>
           <tbody id="projectRows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="admin-section" aria-labelledby="studentsHeading">
+      <div class="admin-section-heading">
+        <h2 id="studentsHeading">Student roster &amp; placement</h2>
+        <a class="btn-secondary" href="/api/admin/export-unassigned">Download Unassigned Students (CSV)</a>
+      </div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead><tr><th>Student</th><th>University ID</th><th>Email</th><th>Skills</th><th>Placement</th><th>Team / event</th></tr></thead>
+          <tbody id="studentRows"></tbody>
         </table>
       </div>
     </section>
 
     <section class="admin-section card">
       <h2>Student account recovery</h2>
-      <p class="project-meta">Set a temporary password for a student account, for example after moving existing accounts to PHP. Share it privately and have the student change it after signing in.</p>
+      <p class="project-meta">Set a temporary password for a student account and share it privately. Ask the student to change it after signing in.</p>
       <form id="accountRecoveryForm" class="admin-filters">
-        <label>
-          <span class="sr-only">Student University ID</span>
-          <input name="university_id" required maxlength="64" placeholder="Student University ID">
-        </label>
-        <label>
-          <span class="sr-only">Temporary password</span>
-          <input name="new_password" type="password" required minlength="10" maxlength="128" placeholder="Temporary password (10+ characters)">
-        </label>
+        <label><span class="sr-only">Student University ID</span><input name="university_id" required maxlength="64" placeholder="Student University ID"></label>
+        <label><span class="sr-only">Temporary password</span><input name="new_password" type="password" required minlength="10" maxlength="128" placeholder="Temporary password (10+ characters)"></label>
         <button class="btn-secondary" type="submit">Set temporary password</button>
       </form>
       <p id="accountRecoveryStatus" class="project-meta" role="status" aria-live="polite"></p>
     </section>
-  </div>
+  </main>
 
   <script>
-    let allProjects = [];
+    let overview = { events: [], projects: [], students: [] };
 
     function cell(row, value) {
       const td = document.createElement('td');
-      td.textContent = value == null ? '—' : String(value);
+      if (value == null) td.textContent = '—';
+      else if (value !== '') td.textContent = String(value);
       row.appendChild(td);
       return td;
     }
 
-    function isFullyStaffed(project) {
-      return Number(project.role_count) > 0 &&
-        Number(project.filled_count) === Number(project.role_count);
+    function appendText(parent, tag, className, value) {
+      const element = document.createElement(tag);
+      if (className) element.className = className;
+      element.textContent = value;
+      parent.appendChild(element);
+      return element;
     }
 
-    function renderProjectRows() {
-      const eventTag = document.getElementById('filterEvent').value;
-      const staffing = document.getElementById('filterStaffing').value;
-      const search = document.getElementById('projectSearch').value.trim().toLowerCase();
-      document.querySelectorAll('.event-filter-card').forEach(card => {
-        card.setAttribute('aria-pressed', String(card.dataset.eventTag === eventTag && Boolean(eventTag)));
+    function renderEvents() {
+      const rows = document.getElementById('eventRows');
+      rows.replaceChildren();
+      const eventFilter = document.getElementById('filterEvent');
+      eventFilter.replaceChildren(new Option('All events', ''));
+      overview.events.forEach(event => {
+        eventFilter.add(new Option(event.event_tag, event.event_tag));
+        const row = document.createElement('tr');
+        cell(row, event.event_tag);
+        cell(row, event.total_projects);
+        cell(row, event.complete_teams_count);
+        cell(row, event.recruiting_teams_count);
+        cell(row, event.filled_slots);
+        cell(row, event.total_slots);
+        rows.appendChild(row);
       });
-      const filtered = allProjects.filter(project => {
-        const fullyStaffed = isFullyStaffed(project);
-        const searchable = `${project.title} ${project.event_tag} ${project.track} ${project.leader_name}`.toLowerCase();
+      if (!overview.events.length) {
+        const row = document.createElement('tr');
+        const empty = cell(row, 'No events have projects yet.');
+        empty.colSpan = 6;
+        rows.appendChild(row);
+      }
+    }
+
+    function renderProjects() {
+      const eventTag = document.getElementById('filterEvent').value;
+      const status = document.getElementById('filterStatus').value;
+      const search = document.getElementById('projectSearch').value.trim().toLowerCase();
+      const filtered = overview.projects.filter(project => {
+        const searchable = `${project.title} ${project.event_tag} ${project.track} ${project.leader_name} ${project.leader_university_id}`.toLowerCase();
         return (!eventTag || project.event_tag === eventTag) &&
-          (staffing === 'all' || (staffing === 'filled' ? fullyStaffed : !fullyStaffed)) &&
+          (status === 'all' || project.completion_status === status) &&
           (!search || searchable.includes(search));
       });
-
       const rows = document.getElementById('projectRows');
       rows.replaceChildren();
       if (!filtered.length) {
         const row = document.createElement('tr');
         const empty = cell(row, 'No projects match these filters.');
-        empty.colSpan = 7;
+        empty.colSpan = 6;
         rows.appendChild(row);
       }
-
       filtered.forEach(project => {
         const row = document.createElement('tr');
-        cell(row, project.event_tag);
-        cell(row, project.title);
+        const projectCell = cell(row, '');
+        appendText(projectCell, 'strong', '', project.title);
+        appendText(projectCell, 'span', 'table-subtext', project.event_tag);
         cell(row, project.track);
-        cell(row, project.leader_name);
-        cell(row, `${Number(project.filled_count) || 0} / ${Number(project.role_count) || 0} filled · ${Number(project.open_count) || 0} open`);
+        const leadCell = cell(row, '');
+        appendText(leadCell, 'strong', '', project.leader_name);
+        appendText(leadCell, 'span', 'table-subtext', `${project.leader_university_id || 'No University ID'} · ${project.leader_email}`);
+        cell(row, `${project.filled_count} / ${project.role_count} filled · ${project.open_count} open`);
         const statusCell = cell(row, '');
-        const badge = document.createElement('span');
-        const fullyStaffed = isFullyStaffed(project);
-        badge.className = `activity-status ${fullyStaffed ? 'status-accepted' : 'staffing-open'}`;
-        badge.textContent = fullyStaffed ? 'Fully staffed' : 'Open roles';
-        statusCell.appendChild(badge);
-        const details = cell(row, '');
-        const link = document.createElement('a');
-        link.className = 'btn-secondary admin-detail-link';
-        link.href = `/project.html?id=${encodeURIComponent(project.id)}`;
-        link.textContent = 'View project';
-        details.appendChild(link);
+        const badge = appendText(statusCell, 'span', `activity-status ${project.completion_status === 'Complete' ? 'status-accepted' : 'staffing-open'}`, project.completion_status);
+        badge.setAttribute('aria-label', `Team status: ${project.completion_status}`);
+        const rosterCell = cell(row, '');
+        const details = document.createElement('details');
+        details.className = 'admin-roster-details';
+        const summary = document.createElement('summary');
+        summary.textContent = `View roster (${project.members.length})`;
+        details.appendChild(summary);
+        const roster = document.createElement('div');
+        roster.className = 'admin-roster-list';
+        project.members.forEach(member => {
+          const memberRow = document.createElement('div');
+          memberRow.className = 'admin-member-row';
+          const identity = document.createElement('div');
+          appendText(identity, 'strong', '', member.name);
+          appendText(identity, 'span', 'table-subtext', `${member.role_title} · ${member.university_id || 'No University ID'} · ${member.email}`);
+          memberRow.appendChild(identity);
+          if (member.vacancy_id) {
+            const remove = document.createElement('button');
+            remove.type = 'button';
+            remove.className = 'btn-secondary admin-action';
+            remove.textContent = 'Remove member';
+            remove.dataset.action = 'remove-member';
+            remove.dataset.vacancyId = member.vacancy_id;
+            remove.dataset.memberName = member.name;
+            memberRow.appendChild(remove);
+          }
+          roster.appendChild(memberRow);
+        });
+        if (!project.members.length) appendText(roster, 'p', 'project-meta', 'No assigned members.');
+        details.appendChild(roster);
+        const deleteProject = document.createElement('button');
+        deleteProject.type = 'button';
+        deleteProject.className = 'btn-secondary admin-action admin-delete';
+        deleteProject.textContent = 'Delete project';
+        deleteProject.dataset.action = 'delete-project';
+        deleteProject.dataset.projectId = project.id;
+        deleteProject.dataset.projectTitle = project.title;
+        details.appendChild(deleteProject);
+        rosterCell.appendChild(details);
         rows.appendChild(row);
       });
+    }
 
-      const eventCount = new Set(filtered.map(project => project.event_tag)).size;
-      document.getElementById('adminStatus').textContent =
-        `Showing ${filtered.length} of ${allProjects.length} projects across ${eventCount} event${eventCount === 1 ? '' : 's'}.`;
+    function renderStudents() {
+      const rows = document.getElementById('studentRows');
+      rows.replaceChildren();
+      overview.students.forEach(student => {
+        const row = document.createElement('tr');
+        if (student.assignment_status === 'Unassigned') row.className = 'is-unassigned';
+        cell(row, student.name);
+        cell(row, student.university_id);
+        cell(row, student.email);
+        cell(row, student.skills);
+        const placement = cell(row, '');
+        const badge = appendText(placement, 'span', `activity-status ${student.assignment_status === 'Assigned' ? 'status-accepted' : 'placement-unassigned'}`, student.assignment_status);
+        badge.setAttribute('aria-label', `Placement status: ${student.assignment_status}`);
+        const teams = student.team_assignments.map(assignment => `${assignment.project_title} (${assignment.event_tag}) · ${assignment.role_title}`);
+        cell(row, teams.join('; '));
+        rows.appendChild(row);
+      });
+      if (!overview.students.length) {
+        const row = document.createElement('tr');
+        const empty = cell(row, 'No student accounts have registered yet.');
+        empty.colSpan = 6;
+        rows.appendChild(row);
+      }
     }
 
     async function loadAdminOverview() {
@@ -166,71 +252,64 @@
       try {
         const response = await fetch('/api/admin/overview');
         const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Unable to load the coordinator overview.');
-
-        const overview = document.getElementById('eventOverview');
-        overview.replaceChildren();
-        const eventFilter = document.getElementById('filterEvent');
-        eventFilter.replaceChildren(new Option('All courses & events', ''));
-        if (!data.events.length) {
-          const empty = document.createElement('p');
-          empty.className = 'card project-meta';
-          empty.textContent = 'No projects have been posted yet.';
-          overview.appendChild(empty);
-        }
-        data.events.forEach(event => {
-          eventFilter.add(new Option(event.event_tag, event.event_tag));
-          const card = document.createElement('button');
-          card.type = 'button';
-          card.className = 'card event-card event-filter-card';
-          card.dataset.eventTag = event.event_tag;
-          card.setAttribute('aria-pressed', 'false');
-          const heading = document.createElement('h3');
-          heading.textContent = event.event_tag;
-          card.appendChild(heading);
-          const metrics = document.createElement('p');
-          const projectCount = Number(event.project_count);
-          metrics.textContent = `${projectCount} project${projectCount === 1 ? '' : 's'} · ${event.filled_count || 0} / ${event.role_count} roles filled`;
-          card.appendChild(metrics);
-          const openRoles = document.createElement('p');
-          openRoles.className = 'event-open-roles';
-          openRoles.textContent = `${event.open_count || 0} open role${Number(event.open_count) === 1 ? '' : 's'}`;
-          card.appendChild(openRoles);
-          overview.appendChild(card);
-        });
-
-        allProjects = data.projects;
-        const fullyStaffed = allProjects.filter(isFullyStaffed);
-        document.getElementById('openProjectCount').textContent = String(allProjects.length - fullyStaffed.length);
-        document.getElementById('staffedProjectCount').textContent = String(fullyStaffed.length);
-        document.getElementById('openRoleCount').textContent =
-          String(allProjects.reduce((total, project) => total + (Number(project.open_count) || 0), 0));
-        document.getElementById('filledRoleCount').textContent =
-          String(allProjects.reduce((total, project) => total + (Number(project.filled_count) || 0), 0));
-        renderProjectRows();
+        if (!response.ok) throw new Error(data.error || 'Unable to load the faculty overview.');
+        overview = data;
+        const summary = data.summary;
+        document.getElementById('totalEvents').textContent = String(summary.total_events);
+        document.getElementById('totalProjects').textContent = String(summary.total_projects);
+        document.getElementById('completeTeams').textContent = String(summary.complete_teams);
+        document.getElementById('recruitingTeams').textContent = String(summary.recruiting_teams);
+        document.getElementById('registeredStudents').textContent = String(summary.total_registered_students);
+        document.getElementById('unassignedStudents').textContent = String(summary.unassigned_students);
+        renderEvents();
+        renderProjects();
+        renderStudents();
+        status.textContent = `Loaded ${summary.total_projects} projects and ${summary.total_registered_students} student accounts.`;
       } catch (error) {
         status.className = 'auth-error';
         status.textContent = error.message;
       }
     }
 
-    document.getElementById('filterEvent').addEventListener('change', renderProjectRows);
-    document.getElementById('filterStaffing').addEventListener('change', renderProjectRows);
-    document.getElementById('projectSearch').addEventListener('input', renderProjectRows);
+    async function moderate(button) {
+      const removeMember = button.dataset.action === 'remove-member';
+      const confirmation = removeMember
+        ? `Remove ${button.dataset.memberName} from this role and reopen the slot?`
+        : `Delete "${button.dataset.projectTitle}" and all of its roles, applications, and memberships?`;
+      if (!window.confirm(confirmation)) return;
+      button.disabled = true;
+      try {
+        const response = await fetch(removeMember ? '/api/admin/members/remove' : '/api/admin/projects/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(removeMember
+            ? { vacancy_id: button.dataset.vacancyId }
+            : { project_id: button.dataset.projectId })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'Unable to complete that moderation action.');
+        await loadAdminOverview();
+        document.getElementById('adminStatus').textContent = result.message;
+      } catch (error) {
+        document.getElementById('adminStatus').className = 'auth-error';
+        document.getElementById('adminStatus').textContent = error.message;
+        button.disabled = false;
+      }
+    }
+
+    document.getElementById('filterEvent').addEventListener('change', renderProjects);
+    document.getElementById('filterStatus').addEventListener('change', renderProjects);
+    document.getElementById('projectSearch').addEventListener('input', renderProjects);
     document.getElementById('clearAdminFilters').addEventListener('click', () => {
       document.getElementById('filterEvent').value = '';
-      document.getElementById('filterStaffing').value = 'open';
+      document.getElementById('filterStatus').value = 'all';
       document.getElementById('projectSearch').value = '';
-      renderProjectRows();
+      renderProjects();
     });
-    document.getElementById('eventOverview').addEventListener('click', event => {
-      const card = event.target.closest('button[data-event-tag]');
-      if (!card) return;
-      document.getElementById('filterEvent').value = card.dataset.eventTag;
-      renderProjectRows();
-      document.getElementById('projectRows').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    document.getElementById('projectRows').addEventListener('click', event => {
+      const button = event.target.closest('button[data-action]');
+      if (button) moderate(button);
     });
-
     document.getElementById('accountRecoveryForm').addEventListener('submit', async event => {
       event.preventDefault();
       const form = event.currentTarget;

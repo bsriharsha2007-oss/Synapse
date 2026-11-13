@@ -4,7 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Project Details - Synapse</title>
-  <script>try { document.documentElement.dataset.theme = localStorage.getItem('synapse-theme') === 'dark' ? 'dark' : 'light'; } catch (error) {}</script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
   <script src="/js/app.js" defer></script>
 </head>
@@ -23,7 +25,7 @@
 
     <div class="card" style="margin-top: 2rem;">
       <h3>Available roles</h3>
-      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1rem;">
+      <p style="font-size: 0.85rem; color: var(--muted); margin-bottom: 1rem;">
         Choose an open role that suits you, then apply with an introduction. Resume and portfolio links are optional.
       </p>
       <p id="projectStatus" class="project-meta" role="status" aria-live="polite"></p>
@@ -41,7 +43,7 @@
   <div id="applyModal" class="modal-overlay" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="modalRoleTitle">
     <div class="modal">
       <h3 style="margin-bottom: 0.5rem;" id="modalRoleTitle">Apply for Role</h3>
-      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 1.25rem;">
+      <p style="font-size: 0.85rem; color: var(--muted); margin-bottom: 1.25rem;">
         Introduce what you can contribute. Add a PDF resume or a portfolio link if you have one.
       </p>
       <form id="applyForm">
@@ -49,6 +51,7 @@
         <div class="form-group">
           <label for="modalPitch">Introduction</label>
           <textarea id="modalPitch" name="pitch_note" rows="4" maxlength="1000" required placeholder="Share what you know, what you would like to learn, and how you can help this project."></textarea>
+          <small class="form-hint">Use exactly two sentences to introduce what you can contribute.</small>
         </div>
         <div class="form-group">
           <label for="modalResume">Resume (optional PDF, up to 5 MB)</label>

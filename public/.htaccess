@@ -1,9 +1,9 @@
 RewriteEngine On
 
-# Allow login page and static assets (CSS/JS/images) to load directly
-RewriteCond %{REQUEST_URI} ^/login\.html$ [NC,OR]
-RewriteCond %{REQUEST_URI} \.(css|js|png|jpg|jpeg|gif|ico|svg)$ [NC]
+# Serve the sign-in page and static assets directly.
+RewriteRule ^login\.html$ - [L,NC]
+RewriteCond %{REQUEST_URI} \.(css|js|png|jpg|jpeg|svg|ico)$ [NC]
 RewriteRule ^ - [L]
 
-# Route everything else (/, /index.html, /admin.html, /api/*) through router.php
+# Route the home page, other HTML pages, and API requests through the application router.
 RewriteRule ^ router.php [QSA,L]

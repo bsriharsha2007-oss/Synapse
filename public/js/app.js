@@ -28,44 +28,6 @@
     return response;
   };
 
-  function getSavedTheme() {
-    try {
-      return localStorage.getItem('synapse-theme') === 'dark' ? 'dark' : 'light';
-    } catch (error) {
-      return 'light';
-    }
-  }
-
-  function applyTheme(theme) {
-    document.documentElement.dataset.theme = theme;
-    const toggle = document.getElementById('themeToggle');
-    if (toggle) {
-      toggle.textContent = theme === 'dark' ? '☀ Light mode' : '☾ Dark mode';
-      toggle.setAttribute('aria-pressed', String(theme === 'dark'));
-      toggle.setAttribute('aria-label', `Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`);
-    }
-    try {
-      localStorage.setItem('synapse-theme', theme);
-    } catch (error) {
-      console.warn('Theme preference could not be saved in this browser.');
-    }
-  }
-
-  applyTheme(getSavedTheme());
-
-  const navLinks = document.querySelector('.nav-links');
-  if (!navLinks) return;
-
-  const themeToggle = document.createElement('button');
-  themeToggle.type = 'button';
-  themeToggle.id = 'themeToggle';
-  themeToggle.className = 'nav-control';
-  themeToggle.addEventListener('click', () => {
-    applyTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
-  });
-  navLinks.appendChild(themeToggle);
-  applyTheme(getSavedTheme());
-
   if (authPage) {
     nativeFetch('/api/auth/session')
       .then(response => {
@@ -80,6 +42,9 @@
       .catch(error => console.error('Unable to check the current sign-in session:', error));
     return;
   }
+
+  const navLinks = document.querySelector('.nav-links');
+  if (!navLinks) return;
 
   nativeFetch('/api/me')
     .then(async response => {

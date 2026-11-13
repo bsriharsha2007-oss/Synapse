@@ -4,8 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Sign in - Synapse</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/css/style.css">
-  <script>try { document.documentElement.dataset.theme = localStorage.getItem('synapse-theme') === 'dark' ? 'dark' : 'light'; } catch (error) {}</script>
   <script src="/js/app.js" defer></script>
 </head>
 <body>
@@ -17,6 +19,14 @@
   <main class="auth-container">
     <section class="card auth-card">
       <div class="auth-brand">Your campus. Your people. Your next big idea.</div>
+      <section class="public-stats" aria-label="Live campus project stats">
+        <p id="publicStatsStatus" class="public-stats-status" role="status" aria-live="polite">Loading campus activity…</p>
+        <div class="public-stats-grid">
+          <div><strong id="activeProjectCount">—</strong><span>active projects</span></div>
+          <div><strong id="openVacancyCount">—</strong><span>open roles</span></div>
+          <div><strong id="completedTeamCount">—</strong><span>complete teams</span></div>
+        </div>
+      </section>
       <h1 id="authTitle">Welcome back</h1>
       <p id="authDescription" class="project-meta">Sign in with your University ID to find your team.</p>
 
@@ -69,6 +79,19 @@
     const loginForm = document.getElementById('loginForm');
     const registerForm = document.getElementById('registerForm');
     const errorMessage = document.getElementById('authError');
+
+    fetch('/api/public-stats')
+      .then(async response => {
+        const stats = await response.json();
+        if (!response.ok) throw new Error(stats.error || 'Campus activity is temporarily unavailable.');
+        document.getElementById('activeProjectCount').textContent = String(stats.active_project_count);
+        document.getElementById('openVacancyCount').textContent = String(stats.open_vacancy_count);
+        document.getElementById('completedTeamCount').textContent = String(stats.completed_team_count);
+        document.getElementById('publicStatsStatus').textContent = 'Live campus activity';
+      })
+      .catch(error => {
+        document.getElementById('publicStatsStatus').textContent = error.message;
+      });
 
     function setMode(mode) {
       const isLogin = mode === 'login';

@@ -93,6 +93,7 @@ before(async () => {
       ...process.env,
       PORT: String(port),
       SYNAPSE_DB_PATH: path.join(tempDirectory, 'synapse-test.db'),
+      SYNAPSE_DEMO_PASSWORD: 'synapse-demo-test-password',
       ADMIN_UNIVERSITY_ID: 'ADMIN-TEST',
       ADMIN_PASSWORD: 'admin-test-password'
     },
@@ -110,6 +111,16 @@ after(async () => {
 });
 
 test('accounts, matching, access controls, team locking, and roster export work end to end', async () => {
+  const publicStats = await request('/api/public-stats');
+  assert.equal(publicStats.status, 200, 'campus activity stats should be available without signing in');
+  assert.equal(publicStats.data.active_project_count, 3);
+  assert.equal(publicStats.data.open_vacancy_count, 4);
+  const demoLogin = await request('/api/auth/login', {
+    method: 'POST',
+    body: { university_id: 'DEMO-STU-1001', password: 'synapse-demo-test-password' }
+  });
+  assert.equal(demoLogin.status, 200, 'seeded student passwords should use the existing authentication format');
+
   const unauthenticatedAdminPage = await request('/admin.html');
   assert.equal(unauthenticatedAdminPage.status, 302, 'faculty pages should redirect unauthenticated visitors');
 
@@ -205,11 +216,17 @@ test('accounts, matching, access controls, team locking, and roster export work 
   });
   assert.equal(project.status, 201, project.text);
 
-  const projects = await request('/api/projects', { cookie: applicant.cookie });
+  const projects = await request('/api/projects?event_tag=web%20tech%20test', { cookie: applicant.cookie });
   assert.equal(projects.status, 200);
   assert.equal(projects.data.length, 1);
   assert.equal(projects.data[0].leader_email, undefined, 'team contact must stay private before acceptance');
   const vacancyId = projects.data[0].vacancies[0].id;
+  const oneSentencePitch = await request('/api/applications', {
+    method: 'POST',
+    cookie: applicant.cookie,
+    body: { vacancy_id: vacancyId, pitch_note: 'I build useful things.' }
+  });
+  assert.equal(oneSentencePitch.status, 400, 'introductions must contain exactly two sentences');
 
   const projectDetails = await request(`/api/projects/${project.data.projectId}`, { cookie: applicant.cookie });
   assert.equal(projectDetails.data.project.leader_email, null, 'non-members must not see team contact details');
@@ -292,6 +309,9 @@ test('accounts, matching, access controls, team locking, and roster export work 
   const acceptedDetails = await request(`/api/projects/${project.data.projectId}`, { cookie: applicant.cookie });
   assert.equal(acceptedDetails.data.project.leader_email, 'lead@campus.example');
   assert.equal(acceptedDetails.data.is_member, true);
+  const completedDiscovery = await request('/api/projects?include_completed=1', { cookie: applicant.cookie });
+  assert.ok(completedDiscovery.data.some(item => item.id === project.data.projectId),
+    'the all-projects filter should include a fully staffed team');
   const updatedApplicantActivity = await request('/api/me/activity', { cookie: applicant.cookie });
   assert.equal(updatedApplicantActivity.data.applications[0].status, 'Accepted');
   const reviewedDetails = await request(`/api/projects/${project.data.projectId}`, { cookie: leader.cookie });
@@ -332,6 +352,16 @@ test('accounts, matching, access controls, team locking, and roster export work 
     }
   });
   assert.equal(formulaProject.status, 201, formulaProject.text);
+  const abbreviationProject = await request('/api/projects?event_tag=Hackathon%20Test', { cookie: applicant.cookie });
+  const abbreviationPitch = await request('/api/applications', {
+    method: 'POST',
+    cookie: applicant.cookie,
+    body: {
+      vacancy_id: abbreviationProject.data.find(item => item.id === formulaProject.data.projectId).vacancies[0].id,
+      pitch_note: 'I use e.g. Node.js, Next.js, and Vue.js, i.e. modern tools. Dr. Smith, Mr. Lee, and Ms. Ray can advise.'
+    }
+  });
+  assert.equal(abbreviationPitch.status, 201, `abbreviations should not inflate the sentence count: ${abbreviationPitch.text}`);
 
   const studentAdminOverview = await request('/api/admin/overview', { cookie: applicant.cookie });
   assert.equal(studentAdminOverview.status, 403, 'students must not access the faculty dashboard');
@@ -345,7 +375,11 @@ test('accounts, matching, access controls, team locking, and roster export work 
   assert.equal(adminLogin.status, 200);
   const adminOverview = await request('/api/admin/overview', { cookie: adminLogin.cookie });
   assert.equal(adminOverview.status, 200);
-  assert.equal(adminOverview.data.events.length, 2);
+  assert.equal(adminOverview.data.events.length, 5);
+  assert.equal(adminOverview.data.summary.total_projects, 5);
+  assert.ok(adminOverview.data.students.some(item => item.university_id === 'DEMO-STU-1001'));
+  assert.equal(adminOverview.data.students.find(item => item.university_id === 'DEMO-STU-1004').assignment_status, 'Unassigned');
+  assert.equal(adminOverview.data.projects.find(item => item.id === 'PRJ-DEMO-WEB').members.length, 2);
   const forbiddenReset = await request('/api/admin/users/reset-password', {
     method: 'POST',
     cookie: applicant.cookie,
@@ -375,6 +409,28 @@ test('accounts, matching, access controls, team locking, and roster export work 
   const roster = await request('/api/admin/export-roster', { cookie: adminLogin.cookie });
   assert.equal(roster.status, 200);
   assert.match(roster.text, /"'=HYPERLINK\(/, 'formula-leading values should be escaped before CSV export');
+  const unassignedExport = await request('/api/admin/export-unassigned', { cookie: adminLogin.cookie });
+  assert.equal(unassignedExport.status, 200);
+  assert.match(unassignedExport.text, /Mira Iyer/);
+  assert.match(unassignedExport.text, /DEMO-STU-1004/);
+
+  const removeMemberVacancyId = leaderDetails.data.vacancies[0].id;
+  const forbiddenMemberRemoval = await request('/api/admin/members/remove', {
+    method: 'POST',
+    cookie: applicant.cookie,
+    body: { vacancy_id: removeMemberVacancyId }
+  });
+  assert.equal(forbiddenMemberRemoval.status, 403, 'students must not moderate team members');
+  const memberRemoval = await request('/api/admin/members/remove', {
+    method: 'POST',
+    cookie: adminLogin.cookie,
+    body: { vacancy_id: removeMemberVacancyId }
+  });
+  assert.equal(memberRemoval.status, 200, memberRemoval.text);
+  const overviewAfterRemoval = await request('/api/admin/overview', { cookie: adminLogin.cookie });
+  const reopenedProject = overviewAfterRemoval.data.projects.find(item => item.id === project.data.projectId);
+  assert.equal(reopenedProject.completion_status, 'Recruiting');
+  assert.equal(reopenedProject.open_count, 1, 'removing a member should reopen their slot');
 
   const deletableProject = await request('/api/projects', {
     method: 'POST',
@@ -393,7 +449,7 @@ test('accounts, matching, access controls, team locking, and roster export work 
   const pendingForDeletedProject = await request('/api/applications', {
     method: 'POST',
     cookie: applicant.cookie,
-    body: { vacancy_id: deletableRole, pitch_note: 'I can test the project carefully and communicate defects clearly.' }
+    body: { vacancy_id: deletableRole, pitch_note: 'I can test the project carefully. I communicate defects clearly.' }
   });
   assert.equal(pendingForDeletedProject.status, 201, pendingForDeletedProject.text);
   const forbiddenProjectDeletion = await request(`/api/projects/${deletableProject.data.projectId}`, {
@@ -429,6 +485,20 @@ test('accounts, matching, access controls, team locking, and roster export work 
     }
   });
   assert.equal(replacementProject.status, 201, 'project deletion should cascade to the team lead membership');
+  const forbiddenModerationDelete = await request('/api/admin/projects/delete', {
+    method: 'POST',
+    cookie: applicant.cookie,
+    body: { project_id: replacementProject.data.projectId }
+  });
+  assert.equal(forbiddenModerationDelete.status, 403, 'students must not delete projects through admin moderation');
+  const moderationDelete = await request('/api/admin/projects/delete', {
+    method: 'POST',
+    cookie: adminLogin.cookie,
+    body: { project_id: replacementProject.data.projectId }
+  });
+  assert.equal(moderationDelete.status, 200, moderationDelete.text);
+  const deletedByAdmin = await request('/api/admin/overview', { cookie: adminLogin.cookie });
+  assert.equal(deletedByAdmin.data.projects.some(item => item.id === replacementProject.data.projectId), false);
 
   const logout = await request('/api/auth/logout', { method: 'POST', cookie: correctPassword.cookie });
   assert.equal(logout.status, 200);
