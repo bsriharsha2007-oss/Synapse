@@ -7,8 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/style.css">
-  <script src="/js/app.js" defer></script>
+  <link rel="stylesheet" href="/css/style.css?v=20261115">
+  <script src="/js/app.js?v=20261115" defer></script>
 </head>
 <body>
   <nav class="navbar">
@@ -141,6 +141,9 @@
       header.appendChild(element('span', `badge ${data.project.track === 'Competitive' ? 'badge-competitive' : 'badge-growth'}`, data.project.track));
       projectCard.appendChild(header);
       projectCard.appendChild(element('p', 'project-description', data.project.description));
+      if (data.project.status === 'Completed') {
+        projectCard.appendChild(element('p', 'project-meta', 'This project is marked completed and is no longer accepting applications.'));
+      }
       if (isLeader) {
         const ownerActions = element('div', 'project-owner-actions');
         const deleteButton = element('button', 'btn-danger', 'Delete project');
@@ -160,14 +163,14 @@
 
       vacanciesList.replaceChildren();
       data.vacancies.forEach(vacancy => {
-        const row = element('article', `vacancy-row${vacancy.status === 'Open' && !isLeader && !data.is_member ? ' vacancy-selectable' : ''}`);
+        const row = element('article', `vacancy-row${vacancy.status === 'Open' && data.project.status === 'Open' && !isLeader && !data.is_member ? ' vacancy-selectable' : ''}`);
         const details = element('div');
         details.appendChild(element('h4', '', vacancy.role_title));
         details.appendChild(element('p', 'project-meta', `Skills: ${vacancy.required_skills}`));
         details.appendChild(element('span', `slot-tag ${vacancy.status === 'Open' ? 'open' : 'filled'}`, vacancy.status));
         row.appendChild(details);
         const existingApplication = data.my_applications.find(application => application.vacancy_id === vacancy.id);
-        if (vacancy.status === 'Open' && !isLeader && !data.is_member && !existingApplication) {
+        if (vacancy.status === 'Open' && data.project.status === 'Open' && !isLeader && !data.is_member && !existingApplication) {
           const button = element('button', 'btn-primary role-apply-action', 'Apply for this role');
           button.type = 'button';
           button.dataset.action = 'apply';
@@ -201,6 +204,8 @@
           setStatus('You published this project. Use the review panel below to manage applicants.');
         } else if (data.is_member) {
           setStatus('You are already on a team for this event.');
+        } else if (data.project.status === 'Completed') {
+          setStatus('This project is completed and is no longer accepting applications.');
         } else if (data.my_applications.some(application => application.vacancy_id === requestedRoleId)) {
           setStatus('You have already applied for this role. Track its decision in My Activity.');
         } else {

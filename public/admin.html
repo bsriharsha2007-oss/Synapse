@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Faculty Portal - Synapse</title>
+  <title>Administrator Portal - Synapse</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="/css/style.css">
-  <script src="/js/app.js" defer></script>
+  <link rel="stylesheet" href="/css/style.css?v=20261115">
+  <script src="/js/app.js?v=20261115" defer></script>
 </head>
 <body>
   <nav class="navbar">
@@ -17,102 +17,123 @@
       <a href="/index.html">Discover Projects</a>
       <a href="/create.html">+ Post Project</a>
       <a href="/profile.html">My Activity</a>
-      <a href="/admin.html">Faculty Portal</a>
+      <a href="/admin.html">Administrator Portal</a>
     </div>
   </nav>
 
   <main class="container">
     <header class="card admin-header">
       <div>
-        <span class="eyebrow">Faculty workspace</span>
-        <h1>Campus team overview</h1>
-        <p class="project-meta admin-intro">Track event participation, review full team rosters, and manage student placements.</p>
+        <span class="eyebrow">Institutional oversight</span>
+        <h1>Administrator portal</h1>
+        <p class="project-meta admin-intro">Review campus participation, project rosters, applications, and student profiles.</p>
       </div>
-      <a class="btn-primary" href="/api/admin/export-roster">Download Master Team Roster (CSV)</a>
+      <div class="activity-card-actions">
+        <a class="btn-primary" href="/api/admin/export-roster">Export team rosters</a>
+        <a class="btn-secondary" href="/api/admin/export-students">Export student directory</a>
+      </div>
     </header>
 
-    <p id="adminStatus" class="project-meta" role="status" aria-live="polite">Loading faculty overview…</p>
+    <p id="adminStatus" class="project-meta" role="status" aria-live="polite">Loading administrator overview…</p>
 
-    <section class="admin-metrics" aria-label="Campus summary metrics">
-      <article class="card admin-metric"><span>Total events</span><strong id="totalEvents">—</strong></article>
-      <article class="card admin-metric"><span>Total projects</span><strong id="totalProjects">—</strong></article>
-      <article class="card admin-metric"><span>Complete teams</span><strong id="completeTeams">—</strong></article>
-      <article class="card admin-metric"><span>Recruiting teams</span><strong id="recruitingTeams">—</strong></article>
-      <article class="card admin-metric"><span>Registered students</span><strong id="registeredStudents">—</strong></article>
-      <article class="card admin-metric"><span>Unassigned students</span><strong id="unassignedStudents">—</strong></article>
-    </section>
+    <div class="auth-tabs admin-tabs" role="tablist" aria-label="Administrator sections">
+      <button type="button" role="tab" aria-selected="true" aria-controls="overviewPanel" data-tab="overviewPanel">Overview &amp; Events</button>
+      <button type="button" role="tab" aria-selected="false" aria-controls="projectsPanel" data-tab="projectsPanel">Projects &amp; Rosters</button>
+      <button type="button" role="tab" aria-selected="false" aria-controls="studentsPanel" data-tab="studentsPanel">Student Directory</button>
+    </div>
 
-    <section class="admin-section" aria-labelledby="eventsHeading">
-      <h2 id="eventsHeading">Events &amp; completion tracker</h2>
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead><tr><th>Event tag</th><th>Projects</th><th>Complete</th><th>Recruiting</th><th>Slots filled</th><th>Total slots</th></tr></thead>
-          <tbody id="eventRows"></tbody>
-        </table>
+    <section id="overviewPanel" role="tabpanel" class="admin-panel">
+      <div class="admin-metrics" aria-label="Platform key performance indicators">
+        <article class="card admin-metric"><span>Registered students</span><strong id="registeredStudents">—</strong></article>
+        <article class="card admin-metric"><span>Projects created</span><strong id="totalProjects">—</strong></article>
+        <article class="card admin-metric"><span>Active / recruiting</span><strong id="activeProjects">—</strong></article>
+        <article class="card admin-metric"><span>Completed teams</span><strong id="completeTeams">—</strong></article>
+        <article class="card admin-metric"><span>Applications submitted</span><strong id="totalApplications">—</strong></article>
+        <article class="card admin-metric"><span>Unassigned students</span><strong id="unassignedStudents">—</strong></article>
       </div>
+
+      <section class="admin-section" aria-labelledby="eventsHeading">
+        <h2 id="eventsHeading">Event-by-event participation</h2>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Event</th><th>Projects</th><th>Completed teams</th><th>Recruiting teams</th><th>Filled slots</th><th>Open slots</th></tr></thead>
+            <tbody id="eventRows"></tbody>
+          </table>
+        </div>
+      </section>
     </section>
 
-    <section class="admin-section" aria-labelledby="projectsHeading">
-      <h2 id="projectsHeading">Projects &amp; team rosters</h2>
-      <div class="admin-filters">
-        <label>
-          <span class="sr-only">Filter projects by event tag</span>
-          <select id="filterEvent"><option value="">All events</option></select>
-        </label>
-        <label>
-          <span class="sr-only">Filter projects by completion status</span>
-          <select id="filterStatus">
-            <option value="all">All statuses</option>
-            <option value="Recruiting">Recruiting</option>
-            <option value="Complete">Complete</option>
-          </select>
-        </label>
+    <section id="projectsPanel" role="tabpanel" class="admin-panel" hidden>
+      <section class="admin-section" aria-labelledby="projectsHeading">
+        <h2 id="projectsHeading">All projects &amp; full team rosters</h2>
+        <div class="admin-filters">
+          <label>
+            <span class="sr-only">Filter projects by event</span>
+            <select id="filterEvent"><option value="">All events</option></select>
+          </label>
+          <label>
+            <span class="sr-only">Filter projects by status</span>
+            <select id="filterStatus">
+              <option value="all">All statuses</option>
+              <option value="Open">Open</option>
+              <option value="Completed">Completed</option>
+            </select>
+          </label>
+          <label class="admin-search">
+            <span class="sr-only">Search projects, team leads, members, or applications</span>
+            <input id="projectSearch" type="search" placeholder="Search projects, leads, members, applications">
+          </label>
+          <button id="clearAdminFilters" class="btn-secondary" type="button">Clear filters</button>
+        </div>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Event / project</th><th>Track</th><th>Team lead</th><th>Slots</th><th>Project status</th><th>Rosters, applications &amp; actions</th></tr></thead>
+            <tbody id="projectRows"></tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+
+    <section id="studentsPanel" role="tabpanel" class="admin-panel" hidden>
+      <section class="admin-section" aria-labelledby="studentsHeading">
+        <div class="admin-section-heading">
+          <div>
+            <h2 id="studentsHeading">Registered student profiles</h2>
+            <p class="project-meta">Search student identity, academic profile, skills, and current team/event assignments.</p>
+          </div>
+          <a class="btn-secondary" href="/api/admin/export-students">Export all students (CSV)</a>
+        </div>
         <label class="admin-search">
-          <span class="sr-only">Search projects or team leads</span>
-          <input id="projectSearch" type="search" placeholder="Search projects or team leads">
+          <span class="sr-only">Search student profiles</span>
+          <input id="studentSearch" type="search" placeholder="Search name, University ID, email, department, or skills">
         </label>
-        <button id="clearAdminFilters" class="btn-secondary" type="button">Clear filters</button>
-      </div>
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead><tr><th>Event / project</th><th>Track</th><th>Team lead</th><th>Slots</th><th>Status</th><th>Full roster &amp; moderation</th></tr></thead>
-          <tbody id="projectRows"></tbody>
-        </table>
-      </div>
-    </section>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Student</th><th>University ID</th><th>Email</th><th>Department / year</th><th>Skills</th><th>GitHub / portfolio</th><th>Assigned team / event</th><th>Registered</th><th>Account controls</th></tr></thead>
+            <tbody id="studentRows"></tbody>
+          </table>
+        </div>
+      </section>
 
-    <section class="admin-section" aria-labelledby="studentsHeading">
-      <div class="admin-section-heading">
-        <h2 id="studentsHeading">Student roster &amp; placement</h2>
-        <a class="btn-secondary" href="/api/admin/export-unassigned">Download Unassigned Students (CSV)</a>
-      </div>
-      <div class="table-wrap">
-        <table class="data-table">
-          <thead><tr><th>Student</th><th>University ID</th><th>Email</th><th>Skills</th><th>Placement</th><th>Team / event</th></tr></thead>
-          <tbody id="studentRows"></tbody>
-        </table>
-      </div>
-    </section>
-
-    <section class="admin-section card">
-      <h2>Student account recovery</h2>
-      <p class="project-meta">Set a temporary password for a student account and share it privately. Ask the student to change it after signing in.</p>
-      <form id="accountRecoveryForm" class="admin-filters">
-        <label><span class="sr-only">Student University ID</span><input name="university_id" required maxlength="64" placeholder="Student University ID"></label>
-        <label><span class="sr-only">Temporary password</span><input name="new_password" type="password" required minlength="10" maxlength="128" placeholder="Temporary password (10+ characters)"></label>
-        <button class="btn-secondary" type="submit">Set temporary password</button>
-      </form>
-      <p id="accountRecoveryStatus" class="project-meta" role="status" aria-live="polite"></p>
+      <section class="admin-section card">
+        <h2>Student account recovery</h2>
+        <p class="project-meta">Set a temporary password for a student account and share it privately.</p>
+        <form id="accountRecoveryForm" class="admin-filters">
+          <label><span class="sr-only">Student University ID</span><input name="university_id" required maxlength="64" placeholder="Student University ID"></label>
+          <label><span class="sr-only">Temporary password</span><input name="new_password" type="password" required minlength="10" maxlength="128" placeholder="Temporary password (10+ characters)"></label>
+          <button class="btn-secondary" type="submit">Set temporary password</button>
+        </form>
+        <p id="accountRecoveryStatus" class="project-meta" role="status" aria-live="polite"></p>
+      </section>
     </section>
   </main>
 
   <script>
-    let overview = { events: [], projects: [], students: [] };
+    let overview = { events: [], projects: [], students: [], summary: {} };
 
     function cell(row, value) {
       const td = document.createElement('td');
-      if (value == null) td.textContent = '—';
-      else if (value !== '') td.textContent = String(value);
+      td.textContent = value == null || value === '' ? '—' : String(value);
       row.appendChild(td);
       return td;
     }
@@ -120,9 +141,21 @@
     function appendText(parent, tag, className, value) {
       const element = document.createElement(tag);
       if (className) element.className = className;
-      element.textContent = value;
+      element.textContent = value == null ? '' : String(value);
       parent.appendChild(element);
       return element;
+    }
+
+    function actionButton(label, action, values, className = 'btn-secondary admin-action') {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = className;
+      button.textContent = label;
+      button.dataset.action = action;
+      Object.entries(values).forEach(([key, value]) => {
+        if (value != null) button.dataset[key] = String(value);
+      });
+      return button;
     }
 
     function renderEvents() {
@@ -138,7 +171,7 @@
         cell(row, event.complete_teams_count);
         cell(row, event.recruiting_teams_count);
         cell(row, event.filled_slots);
-        cell(row, event.total_slots);
+        cell(row, event.open_slots);
         rows.appendChild(row);
       });
       if (!overview.events.length) {
@@ -154,9 +187,14 @@
       const status = document.getElementById('filterStatus').value;
       const search = document.getElementById('projectSearch').value.trim().toLowerCase();
       const filtered = overview.projects.filter(project => {
-        const searchable = `${project.title} ${project.event_tag} ${project.track} ${project.leader_name} ${project.leader_university_id}`.toLowerCase();
+        const people = [...project.members, ...project.applications].map(person =>
+          `${person.name || person.applicant_name || ''} ${person.email || person.applicant_email || ''}`);
+        const searchable = [
+          project.title, project.description, project.event_tag, project.track,
+          project.leader_name, project.leader_university_id, ...people
+        ].join(' ').toLowerCase();
         return (!eventTag || project.event_tag === eventTag) &&
-          (status === 'all' || project.completion_status === status) &&
+          (status === 'all' || project.status === status) &&
           (!search || searchable.includes(search));
       });
       const rows = document.getElementById('projectRows');
@@ -166,83 +204,145 @@
         const empty = cell(row, 'No projects match these filters.');
         empty.colSpan = 6;
         rows.appendChild(row);
+        return;
       }
       filtered.forEach(project => {
         const row = document.createElement('tr');
         const projectCell = cell(row, '');
         appendText(projectCell, 'strong', '', project.title);
         appendText(projectCell, 'span', 'table-subtext', project.event_tag);
+        appendText(projectCell, 'span', 'table-subtext', project.description);
         cell(row, project.track);
         const leadCell = cell(row, '');
         appendText(leadCell, 'strong', '', project.leader_name);
         appendText(leadCell, 'span', 'table-subtext', `${project.leader_university_id || 'No University ID'} · ${project.leader_email}`);
-        cell(row, `${project.filled_count} / ${project.role_count} filled · ${project.open_count} open`);
+        cell(row, `${project.filled_count} filled · ${project.open_count} open · ${project.application_count} applications`);
         const statusCell = cell(row, '');
-        const badge = appendText(statusCell, 'span', `activity-status ${project.completion_status === 'Complete' ? 'status-accepted' : 'staffing-open'}`, project.completion_status);
-        badge.setAttribute('aria-label', `Team status: ${project.completion_status}`);
-        const rosterCell = cell(row, '');
+        appendText(statusCell, 'span', `activity-status ${project.status === 'Completed' ? 'status-accepted' : 'staffing-open'}`, project.status);
+        const detailsCell = cell(row, '');
         const details = document.createElement('details');
         details.className = 'admin-roster-details';
         const summary = document.createElement('summary');
-        summary.textContent = `View roster (${project.members.length})`;
+        summary.textContent = `View roster (${project.members.length}) and applications (${project.applications.length})`;
         details.appendChild(summary);
         const roster = document.createElement('div');
         roster.className = 'admin-roster-list';
+        appendText(roster, 'strong', '', 'Assigned team members');
         project.members.forEach(member => {
           const memberRow = document.createElement('div');
           memberRow.className = 'admin-member-row';
           const identity = document.createElement('div');
           appendText(identity, 'strong', '', member.name);
-          appendText(identity, 'span', 'table-subtext', `${member.role_title} · ${member.university_id || 'No University ID'} · ${member.email}`);
+          appendText(identity, 'span', 'table-subtext',
+            `${member.role_title} · ${member.university_id || 'No University ID'} · ${member.email}`);
           memberRow.appendChild(identity);
           if (member.vacancy_id) {
-            const remove = document.createElement('button');
-            remove.type = 'button';
-            remove.className = 'btn-secondary admin-action';
-            remove.textContent = 'Remove member';
-            remove.dataset.action = 'remove-member';
-            remove.dataset.vacancyId = member.vacancy_id;
-            remove.dataset.memberName = member.name;
-            memberRow.appendChild(remove);
+            memberRow.appendChild(actionButton('Remove member', 'remove-member', {
+              vacancyId: member.vacancy_id,
+              memberName: member.name
+            }));
           }
           roster.appendChild(memberRow);
         });
         if (!project.members.length) appendText(roster, 'p', 'project-meta', 'No assigned members.');
+        appendText(roster, 'strong', '', 'Vacancy slots');
+        project.vacancies.forEach(vacancy => {
+          appendText(roster, 'p', 'table-subtext',
+            `${vacancy.role_title} · ${vacancy.status} · ${vacancy.required_skills}${vacancy.assigned_user_name ? ` · ${vacancy.assigned_user_name} (${vacancy.assigned_user_university_id || 'No University ID'})` : ''}`);
+        });
+        appendText(roster, 'strong', '', 'Submitted applications');
+        project.applications.forEach(application => {
+          const applicationRow = document.createElement('div');
+          applicationRow.className = 'admin-member-row';
+          const applicationDetails = document.createElement('div');
+          appendText(applicationDetails, 'strong', '', `${application.applicant_name} · ${application.status}`);
+          appendText(applicationDetails, 'span', 'table-subtext',
+            `${application.role_title} · ${application.applicant_university_id || 'No University ID'} · ${application.applicant_email}`);
+          appendText(applicationDetails, 'p', 'project-meta', application.pitch_note);
+          if (application.proof_url) {
+            const proofUrl = safeHttpUrl(application.proof_url);
+            if (proofUrl) {
+              const proof = document.createElement('a');
+              proof.href = proofUrl;
+              proof.target = '_blank';
+              proof.rel = 'noopener noreferrer';
+              proof.textContent = 'Open proof link';
+              applicationDetails.appendChild(proof);
+            }
+          }
+          applicationRow.appendChild(applicationDetails);
+          roster.appendChild(applicationRow);
+        });
+        if (!project.applications.length) appendText(roster, 'p', 'project-meta', 'No applications submitted.');
+        const projectActions = document.createElement('div');
+        projectActions.className = 'activity-card-actions';
+        projectActions.appendChild(actionButton(
+          project.status === 'Completed' ? 'Reopen project' : 'Mark completed',
+          'project-status',
+          { projectId: project.id, nextStatus: project.status === 'Completed' ? 'Open' : 'Completed' }
+        ));
+        projectActions.appendChild(actionButton('Delete project', 'delete-project', {
+          projectId: project.id,
+          projectTitle: project.title
+        }, 'btn-danger admin-action'));
+        roster.appendChild(projectActions);
         details.appendChild(roster);
-        const deleteProject = document.createElement('button');
-        deleteProject.type = 'button';
-        deleteProject.className = 'btn-secondary admin-action admin-delete';
-        deleteProject.textContent = 'Delete project';
-        deleteProject.dataset.action = 'delete-project';
-        deleteProject.dataset.projectId = project.id;
-        deleteProject.dataset.projectTitle = project.title;
-        details.appendChild(deleteProject);
-        rosterCell.appendChild(details);
+        detailsCell.appendChild(details);
         rows.appendChild(row);
       });
     }
 
+    function safeHttpUrl(value) {
+      try {
+        const url = new URL(value);
+        return ['http:', 'https:'].includes(url.protocol) ? url.href : null;
+      } catch (error) {
+        return null;
+      }
+    }
+
     function renderStudents() {
+      const search = document.getElementById('studentSearch').value.trim().toLowerCase();
+      const students = overview.students.filter(student => {
+        const assignments = student.team_assignments.map(item =>
+          `${item.project_title} ${item.event_tag} ${item.role_title}`).join(' ');
+        return `${student.name} ${student.university_id} ${student.email} ${student.department} ${student.year_of_study} ${student.skills} ${assignments}`
+          .toLowerCase().includes(search);
+      });
       const rows = document.getElementById('studentRows');
       rows.replaceChildren();
-      overview.students.forEach(student => {
+      students.forEach(student => {
         const row = document.createElement('tr');
         if (student.assignment_status === 'Unassigned') row.className = 'is-unassigned';
         cell(row, student.name);
         cell(row, student.university_id);
         cell(row, student.email);
+        cell(row, [student.department, student.year_of_study].filter(Boolean).join(' · '));
         cell(row, student.skills);
-        const placement = cell(row, '');
-        const badge = appendText(placement, 'span', `activity-status ${student.assignment_status === 'Assigned' ? 'status-accepted' : 'placement-unassigned'}`, student.assignment_status);
-        badge.setAttribute('aria-label', `Placement status: ${student.assignment_status}`);
-        const teams = student.team_assignments.map(assignment => `${assignment.project_title} (${assignment.event_tag}) · ${assignment.role_title}`);
-        cell(row, teams.join('; '));
+        const githubCell = cell(row, '');
+        const githubUrl = student.github_url ? safeHttpUrl(student.github_url) : null;
+        if (githubUrl) {
+          const githubLink = document.createElement('a');
+          githubLink.href = githubUrl;
+          githubLink.target = '_blank';
+          githubLink.rel = 'noopener noreferrer';
+          githubLink.textContent = 'Open profile';
+          githubCell.appendChild(githubLink);
+        }
+        cell(row, student.team_assignments.map(item =>
+          `${item.project_title} (${item.event_tag}) · ${item.role_title}`).join('; ') || 'Unassigned');
+        cell(row, student.created_at);
+        const controls = cell(row, '');
+        controls.appendChild(actionButton('Delete account', 'delete-user', {
+          userId: student.id,
+          userName: student.name
+        }, 'btn-danger admin-action'));
         rows.appendChild(row);
       });
-      if (!overview.students.length) {
+      if (!students.length) {
         const row = document.createElement('tr');
-        const empty = cell(row, 'No student accounts have registered yet.');
-        empty.colSpan = 6;
+        const empty = cell(row, search ? 'No student profiles match this search.' : 'No student accounts have registered yet.');
+        empty.colSpan = 9;
         rows.appendChild(row);
       }
     }
@@ -252,54 +352,86 @@
       try {
         const response = await fetch('/api/admin/overview');
         const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Unable to load the faculty overview.');
+        if (!response.ok) throw new Error(data.error || 'Unable to load the administrator overview.');
         overview = data;
         const summary = data.summary;
-        document.getElementById('totalEvents').textContent = String(summary.total_events);
         document.getElementById('totalProjects').textContent = String(summary.total_projects);
+        document.getElementById('activeProjects').textContent = String(summary.active_projects);
         document.getElementById('completeTeams').textContent = String(summary.complete_teams);
-        document.getElementById('recruitingTeams').textContent = String(summary.recruiting_teams);
         document.getElementById('registeredStudents').textContent = String(summary.total_registered_students);
+        document.getElementById('totalApplications').textContent = String(summary.total_applications);
         document.getElementById('unassignedStudents').textContent = String(summary.unassigned_students);
         renderEvents();
         renderProjects();
         renderStudents();
-        status.textContent = `Loaded ${summary.total_projects} projects and ${summary.total_registered_students} student accounts.`;
+        status.className = 'project-meta';
+        status.textContent = `Loaded ${summary.total_projects} projects, ${summary.total_registered_students} students, and ${summary.total_applications} applications.`;
+        return true;
       } catch (error) {
         status.className = 'auth-error';
         status.textContent = error.message;
+        return false;
       }
     }
 
     async function moderate(button) {
-      const removeMember = button.dataset.action === 'remove-member';
-      const confirmation = removeMember
-        ? `Remove ${button.dataset.memberName} from this role and reopen the slot?`
-        : `Delete "${button.dataset.projectTitle}" and all of its roles, applications, and memberships?`;
+      const action = button.dataset.action;
+      let endpoint;
+      let payload;
+      let confirmation;
+      if (action === 'remove-member') {
+        endpoint = '/api/admin/members/remove';
+        payload = { vacancy_id: button.dataset.vacancyId };
+        confirmation = `Remove ${button.dataset.memberName} from this role and reopen the slot?`;
+      } else if (action === 'delete-project') {
+        endpoint = '/api/admin/projects/delete';
+        payload = { project_id: button.dataset.projectId };
+        confirmation = `Delete "${button.dataset.projectTitle}" and all of its roles, applications, and memberships?`;
+      } else if (action === 'project-status') {
+        endpoint = '/api/admin/projects/status';
+        payload = { project_id: button.dataset.projectId, status: button.dataset.nextStatus };
+        confirmation = `Change this project status to ${button.dataset.nextStatus}?`;
+      } else {
+        endpoint = '/api/admin/users/delete';
+        payload = { user_id: button.dataset.userId };
+        confirmation = `Delete student account "${button.dataset.userName}" and its associated projects and activity?`;
+      }
       if (!window.confirm(confirmation)) return;
       button.disabled = true;
       try {
-        const response = await fetch(removeMember ? '/api/admin/members/remove' : '/api/admin/projects/delete', {
+        const response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(removeMember
-            ? { vacancy_id: button.dataset.vacancyId }
-            : { project_id: button.dataset.projectId })
+          body: JSON.stringify(payload)
         });
         const result = await response.json();
-        if (!response.ok) throw new Error(result.error || 'Unable to complete that moderation action.');
-        await loadAdminOverview();
-        document.getElementById('adminStatus').textContent = result.message;
+        if (!response.ok) throw new Error(result.error || 'Unable to complete that administrator action.');
+        if (await loadAdminOverview()) {
+          document.getElementById('adminStatus').textContent = result.message;
+        } else {
+          document.getElementById('adminStatus').textContent = `Action saved. ${document.getElementById('adminStatus').textContent}`;
+        }
       } catch (error) {
-        document.getElementById('adminStatus').className = 'auth-error';
-        document.getElementById('adminStatus').textContent = error.message;
+        const status = document.getElementById('adminStatus');
+        status.className = 'auth-error';
+        status.textContent = error.message;
         button.disabled = false;
       }
     }
 
+    document.querySelectorAll('[data-tab]').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('[data-tab]').forEach(item => {
+          const selected = item === tab;
+          item.setAttribute('aria-selected', String(selected));
+          document.getElementById(item.dataset.tab).hidden = !selected;
+        });
+      });
+    });
     document.getElementById('filterEvent').addEventListener('change', renderProjects);
     document.getElementById('filterStatus').addEventListener('change', renderProjects);
     document.getElementById('projectSearch').addEventListener('input', renderProjects);
+    document.getElementById('studentSearch').addEventListener('input', renderStudents);
     document.getElementById('clearAdminFilters').addEventListener('click', () => {
       document.getElementById('filterEvent').value = '';
       document.getElementById('filterStatus').value = 'all';
@@ -307,6 +439,10 @@
       renderProjects();
     });
     document.getElementById('projectRows').addEventListener('click', event => {
+      const button = event.target.closest('button[data-action]');
+      if (button) moderate(button);
+    });
+    document.getElementById('studentRows').addEventListener('click', event => {
       const button = event.target.closest('button[data-action]');
       if (button) moderate(button);
     });

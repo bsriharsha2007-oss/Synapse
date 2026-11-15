@@ -1,5 +1,5 @@
 const assert = require('node:assert/strict');
-const { spawn } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
 const fs = require('node:fs/promises');
 const net = require('node:net');
 const os = require('node:os');
@@ -176,10 +176,18 @@ test('accounts, matching, access controls, team locking, and roster export work 
       name: 'STUDENT-1',
       email: 'student@campus.example',
       skills: 'HTML, CSS, JavaScript',
-      github_url: 'https://github.com/student'
+      github_url: 'https://github.com/student',
+      department: 'Computer Science',
+      year_of_study: '3rd year',
+      bio: 'Interested in accessible campus software.'
     }
   });
   assert.equal(updatedProfile.status, 200, updatedProfile.text);
+  const persistedProfile = await request('/api/me', { cookie: applicant.cookie });
+  assert.equal(persistedProfile.data.university_id, 'STUDENT-1');
+  assert.equal(persistedProfile.data.department, 'Computer Science');
+  assert.equal(persistedProfile.data.year_of_study, '3rd year');
+  assert.equal(persistedProfile.data.bio, 'Interested in accessible campus software.');
   const unsafeProfileLink = await request('/api/profile', {
     method: 'POST',
     cookie: applicant.cookie,
@@ -314,6 +322,11 @@ test('accounts, matching, access controls, team locking, and roster export work 
     'the all-projects filter should include a fully staffed team');
   const updatedApplicantActivity = await request('/api/me/activity', { cookie: applicant.cookie });
   assert.equal(updatedApplicantActivity.data.applications[0].status, 'Accepted');
+  assert.equal(updatedApplicantActivity.data.applications[0].pitch_note, pitch);
+  assert.equal(updatedApplicantActivity.data.teams.some(team => team.project_id === project.data.projectId), true);
+  const fullApplicantProfile = await request('/api/me', { cookie: applicant.cookie });
+  assert.equal(fullApplicantProfile.data.applications[0].project_title, '<img src=x onerror=alert(1)> Matchmaker');
+  assert.equal(fullApplicantProfile.data.active_teams[0].role_title, 'Frontend Engineer');
   const reviewedDetails = await request(`/api/projects/${project.data.projectId}`, { cookie: leader.cookie });
   assert.equal(reviewedDetails.data.applications.find(item => item.applicant_name === 'STUDENT-1').applicant_email, 'student@campus.example');
   assert.equal(reviewedDetails.data.applications.find(item => item.applicant_name === 'STUDENT-2').status, 'Declined');
@@ -380,6 +393,9 @@ test('accounts, matching, access controls, team locking, and roster export work 
   assert.ok(adminOverview.data.students.some(item => item.university_id === 'DEMO-STU-1001'));
   assert.equal(adminOverview.data.students.find(item => item.university_id === 'DEMO-STU-1004').assignment_status, 'Unassigned');
   assert.equal(adminOverview.data.projects.find(item => item.id === 'PRJ-DEMO-WEB').members.length, 2);
+  assert.equal(adminOverview.data.students.find(item => item.university_id === 'STUDENT-1').department, 'Computer Science');
+  assert.ok(adminOverview.data.projects.find(item => item.id === project.data.projectId).applications.length >= 2);
+  assert.equal(adminOverview.data.projects.find(item => item.id === project.data.projectId).vacancies[0].status, 'Filled');
   const forbiddenReset = await request('/api/admin/users/reset-password', {
     method: 'POST',
     cookie: applicant.cookie,
@@ -402,6 +418,26 @@ test('accounts, matching, access controls, team locking, and roster export work 
   assert.equal(staffedProject.open_count, 0, 'faculty overview should identify fully staffed projects');
   const openProject = adminOverview.data.projects.find(item => item.id === formulaProject.data.projectId);
   assert.equal(openProject.open_count, 1);
+  const forbiddenStatusChange = await request('/api/admin/projects/status', {
+    method: 'POST',
+    cookie: applicant.cookie,
+    body: { project_id: formulaProject.data.projectId, status: 'Completed' }
+  });
+  assert.equal(forbiddenStatusChange.status, 403, 'students must not change project status');
+  const projectStatusChange = await request('/api/admin/projects/status', {
+    method: 'POST',
+    cookie: adminLogin.cookie,
+    body: { project_id: formulaProject.data.projectId, status: 'Completed' }
+  });
+  assert.equal(projectStatusChange.status, 200, projectStatusChange.text);
+  const completedProjectOverview = await request('/api/admin/overview', { cookie: adminLogin.cookie });
+  assert.equal(completedProjectOverview.data.projects.find(item => item.id === formulaProject.data.projectId).status, 'Completed');
+  const reopenProject = await request('/api/admin/projects/status', {
+    method: 'POST',
+    cookie: adminLogin.cookie,
+    body: { project_id: formulaProject.data.projectId, status: 'Open' }
+  });
+  assert.equal(reopenProject.status, 200);
   const discoverableProjects = await request('/api/projects', { cookie: applicant.cookie });
   assert.equal(discoverableProjects.data.some(item => item.id === project.data.projectId), false,
     'fully staffed projects should be hidden from the open-project discovery feed');
@@ -413,6 +449,10 @@ test('accounts, matching, access controls, team locking, and roster export work 
   assert.equal(unassignedExport.status, 200);
   assert.match(unassignedExport.text, /Mira Iyer/);
   assert.match(unassignedExport.text, /DEMO-STU-1004/);
+  const studentsExport = await request('/api/admin/export-students', { cookie: adminLogin.cookie });
+  assert.equal(studentsExport.status, 200);
+  assert.match(studentsExport.text, /Computer Science/);
+  assert.match(studentsExport.text, /STUDENT-1/);
 
   const removeMemberVacancyId = leaderDetails.data.vacancies[0].id;
   const forbiddenMemberRemoval = await request('/api/admin/members/remove', {
@@ -500,8 +540,61 @@ test('accounts, matching, access controls, team locking, and roster export work 
   const deletedByAdmin = await request('/api/admin/overview', { cookie: adminLogin.cookie });
   assert.equal(deletedByAdmin.data.projects.some(item => item.id === replacementProject.data.projectId), false);
 
+  const spamAccount = await register('SPAM-TEST', 'spam@campus.example');
+  const forbiddenAdminDeletion = await request('/api/admin/users/delete', {
+    method: 'POST',
+    cookie: adminLogin.cookie,
+    body: { user_id: adminLogin.data.user.id }
+  });
+  assert.equal(forbiddenAdminDeletion.status, 403, 'administrator accounts cannot be deleted from student management');
+  const studentDeletion = await request('/api/admin/users/delete', {
+    method: 'POST',
+    cookie: adminLogin.cookie,
+    body: { user_id: spamAccount.user.id }
+  });
+  assert.equal(studentDeletion.status, 200, studentDeletion.text);
+  const overviewAfterStudentDeletion = await request('/api/admin/overview', { cookie: adminLogin.cookie });
+  assert.equal(overviewAfterStudentDeletion.data.students.some(item => item.id === spamAccount.user.id), false);
+
   const logout = await request('/api/auth/logout', { method: 'POST', cookie: correctPassword.cookie });
   assert.equal(logout.status, 200);
   const afterLogout = await request('/api/me', { cookie: correctPassword.cookie });
   assert.equal(afterLogout.status, 401, 'signing out should invalidate the old session');
+});
+
+test('database initialization upgrades a legacy schema without losing accounts', () => {
+  const legacyPath = path.join(tempDirectory, 'legacy-schema.db');
+  const env = { ...process.env, SYNAPSE_DB_PATH: legacyPath };
+  const createLegacy = spawnSync('php', ['-r', `
+    $db = new PDO('sqlite:' . getenv('SYNAPSE_DB_PATH'));
+    $db->exec("CREATE TABLE users (
+      id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT UNIQUE NOT NULL,
+      skills TEXT NOT NULL DEFAULT '', role TEXT NOT NULL DEFAULT 'student',
+      university_id TEXT, password_hash TEXT, created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )");
+    $db->exec("INSERT INTO users (id, name, email, university_id) VALUES ('legacy-1', 'Legacy Student', 'legacy@campus.example', 'LEGACY-1')");
+  `], { cwd: workspace, env, encoding: 'utf8' });
+  assert.equal(createLegacy.status, 0, createLegacy.stderr);
+
+  const migrate = spawnSync('php', ['-r', `
+    require 'database.php';
+    $db = database();
+    $user = $db->query("SELECT id, name, department, year_of_study, bio FROM users WHERE id = 'legacy-1'")->fetch();
+    echo json_encode([
+      'user' => $user,
+      'foreign_keys' => $db->query('PRAGMA foreign_keys')->fetchColumn(),
+      'journal_mode' => $db->query('PRAGMA journal_mode')->fetchColumn(),
+      'synchronous' => $db->query('PRAGMA synchronous')->fetchColumn()
+    ]);
+  `], { cwd: workspace, env, encoding: 'utf8' });
+  assert.equal(migrate.status, 0, migrate.stderr);
+  const result = JSON.parse(migrate.stdout);
+  assert.equal(result.user.id, 'legacy-1');
+  assert.equal(result.user.name, 'Legacy Student');
+  assert.equal(result.user.department, '');
+  assert.equal(result.user.year_of_study, '');
+  assert.equal(result.user.bio, '');
+  assert.equal(Number(result.foreign_keys), 1);
+  assert.equal(result.journal_mode.toLowerCase(), 'wal');
+  assert.equal(Number(result.synchronous), 2);
 });
