@@ -35,6 +35,8 @@ Synapse is a full-stack campus team formation platform built with **HTML5, CSS3,
 
 ---
 
+
+
 ## Project Structure
 
 ```text
