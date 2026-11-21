@@ -7,5 +7,7 @@
 - `app.js` — Role-Based Access Control (RBAC), squad application & resume attachment workflows, CSV roster exporter, and Three.js 3D neural constellation animation.
 
 ## Default Credentials
-- **Admin Portal:** `admin.synapse@presidencyuniversity.in` (or `ADMIN-PU-01`) / `admin123`
 - **Demo Student:** `20251CSE0028` / `student123`
+
+##Render 
+-**Deployed webpage in render :** `https://synapse-1-7lkk.onrender.com`
