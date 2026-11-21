@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Synapse — Presidency University Campus Matchmaking &amp; Innovation Hub</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@600;700;800&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <canvas id="neural-canvas"></canvas>
+
+  <!-- Floating Theme Switcher -->
+  <button id="themeToggle" class="theme-pill" aria-label="Toggle Visual Theme">
+    <span id="themeIcon">☾</span>
+    <span id="themeLabel">Abyssal Dark</span>
+  </button>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="toast-banner" role="status" aria-live="polite"></div>
+
+  <!-- =========================================================
+       1. AUTHENTICATION & ONBOARDING GATEWAY
+       ========================================================= -->
+  <main id="authView" class="auth-shell">
+    <div class="auth-grid">
+      <!-- Left Pitch & Live Telemetry -->
+      <section class="hero-copy">
+        <div class="campus-badge">
+          <span class="pulse-dot"></span>
+          PRESIDENCY UNIVERSITY BENGALURU &bull; INNOVATION HUB
+        </div>
+        <h1 class="hero-title">Synapse <span>Campus Matchmaking</span></h1>
+        <p class="hero-sub">
+          Discover hackathon teammates across CSE, ECE, Data Science, and ISE. Pitch problem statements, register squads for flagship campus sprints, and build production prototypes together.
+        </p>
+
+        <div class="metrics-strip">
+          <div class="metric-card tilt-card">
+            <div class="metric-val" id="heroSquadCount">48+</div>
+            <div class="metric-lbl">ACTIVE SQUADS</div>
+          </div>
+          <div class="metric-card tilt-card">
+            <div class="metric-val" id="heroEventCount">12</div>
+            <div class="metric-lbl">HACKATHONS</div>
+          </div>
+          <div class="metric-card tilt-card">
+            <div class="metric-val">94%</div>
+            <div class="metric-lbl">SKILL MATCH</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Right Glassmorphism Sign In / Register Card -->
+      <section class="glass-panel auth-card tilt-card">
+        <div class="segmented-tabs">
+          <button type="button" class="seg-btn active" id="tabSignIn" onclick="switchAuthTab('signin')">Portal Sign In</button>
+          <button type="button" class="seg-btn" id="tabRegister" onclick="switchAuthTab('register')">New Student Registration</button>
+        </div>
+
+        <!-- Sign In Form -->
+        <form id="signInForm" onsubmit="handleSignIn(event)">
+          <div class="form-group">
+            <label for="loginIdentifier">University Email or Roll / USN</label>
+            <input type="text" id="loginIdentifier" class="glass-input" placeholder="20251CSE0028 or name@presidencyuniversity.in" required />
+          </div>
+          <div class="form-group">
+            <label for="loginPassword">Password</label>
+            <input type="password" id="loginPassword" class="glass-input" placeholder="••••••••" required />
+          </div>
+          <button type="submit" class="primary-btn full-width">
+            Enter Synapse Workspace &rarr;
+          </button>
+          <div class="quick-demo-row">
+            <button type="button" class="chip-btn" onclick="fillDemoStudent()">Demo Student (20251CSE0028)</button>
+            <button type="button" class="chip-btn" onclick="fillDemoAdmin()">Admin Access</button>
+          </div>
+        </form>
+
+        <!-- Registration Form -->
+        <form id="registerForm" class="hidden" onsubmit="handleRegister(event)">
+          <div class="two-col">
+            <div class="form-group">
+              <label for="regName">Full Name</label>
+              <input type="text" id="regName" class="glass-input" placeholder="e.g., B. Sri Harsha" required />
+            </div>
+            <div class="form-group">
+              <label for="regRoll">Roll Number / USN</label>
+              <input type="text" id="regRoll" class="glass-input" placeholder="20251CSE0028" required />
+            </div>
+          </div>
+          <div class="two-col">
+            <div class="form-group">
+              <label for="regDept">Department</label>
+              <select id="regDept" class="glass-input">
+                <option value="Computer Science & Engineering">Computer Science &amp; Engineering</option>
+                <option value="CSE (AI & Machine Learning)">CSE (AI &amp; Machine Learning)</option>
+                <option value="CSE (Data Science)">CSE (Data Science)</option>
+                <option value="Electronics & Communication">Electronics &amp; Communication</option>
+                <option value="Information Science">Information Science</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="regYear">Academic Year</label>
+              <select id="regYear" class="glass-input">
+                <option value="1st Year">1st Year</option>
+                <option value="2nd Year" selected>2nd Year</option>
+                <option value="3rd Year">3rd Year</option>
+                <option value="4th Year">4th Year</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label for="regEmail">University Email</label>
+            <input type="email" id="regEmail" class="glass-input" placeholder="rollno@presidencyuniversity.in" required />
+          </div>
+          <div class="form-group">
+            <label for="regSkills">Primary Skills (comma-separated)</label>
+            <input type="text" id="regSkills" class="glass-input" placeholder="Python, React, Three.js, ESP32, SQL" required />
+          </div>
+          <div class="form-group">
+            <label for="regPassword">Create Password</label>
+            <input type="password" id="regPassword" class="glass-input" placeholder="Minimum 6 characters" minlength="6" required />
+          </div>
+          <button type="submit" class="primary-btn full-width">
+            Create Verified Student Account &rarr;
+          </button>
+        </form>
+      </section>
+    </div>
+  </main>
+
+  <!-- =========================================================
+       2. STUDENT MATCHMAKING PORTAL
+       ========================================================= -->
+  <div id="studentPortal" class="portal-shell hidden">
+    <header class="topbar">
+      <div class="brand-cluster">
+        <div class="brand-orb">S</div>
+        <div>
+          <div class="brand-name">Synapse</div>
+          <div class="brand-sub">STUDENT MATCHMAKING PORTAL</div>
+        </div>
+      </div>
+      <div class="user-cluster">
+        <div class="user-meta">
+          <div id="navStudentName" class="user-name">Student</div>
+          <div id="navStudentSub" class="user-id">ROLL &bull; STUDENT</div>
+        </div>
+        <button class="signout-btn" onclick="signOut()">&#8617; Sign Out</button>
+      </div>
+    </header>
+
+    <!-- Welcome & Pill Navigation -->
+    <section class="glass-panel welcome-banner">
+      <div>
+        <h2 id="welcomeHeading">Welcome back</h2>
+        <p id="welcomeSub" class="mono-accent">Department &bull; Year &bull; Roll</p>
+      </div>
+      <nav class="nav-pills" aria-label="Student Portal Sections">
+        <button class="nav-pill active" data-tab="hub" onclick="switchStudentTab('hub')">My Profile &amp; Hub</button>
+        <button class="nav-pill" data-tab="posts" onclick="switchStudentTab('posts')">My Posts &amp; Registrations</button>
+        <button class="nav-pill" data-tab="events" onclick="switchStudentTab('events')">Campus Events</button>
+        <button class="nav-pill" data-tab="projects" onclick="switchStudentTab('projects')">Live Projects</button>
+        <button class="nav-pill" data-tab="peers" onclick="switchStudentTab('peers')">Peer Matchmaking</button>
+      </nav>
+    </section>
+
+    <!-- TAB 1: MY PROFILE & HUB -->
+    <section id="studentTab-hub" class="student-section">
+      <div class="dashboard-grid">
+        <div class="glass-panel panel-pad">
+          <div class="panel-header-row">
+            <h3>Student Profile &amp; Technical Stack</h3>
+            <span id="profileVerifyBadge" class="status-badge">Pending Verification</span>
+          </div>
+          <form onsubmit="saveStudentProfile(event)">
+            <div class="two-col">
+              <div class="form-group">
+                <label>Full Name</label>
+                <input type="text" id="profName" class="glass-input" required />
+              </div>
+              <div class="form-group">
+                <label>Academic Year</label>
+                <select id="profYear" class="glass-input">
+                  <option value="1st Year">1st Year</option>
+                  <option value="2nd Year">2nd Year</option>
+                  <option value="3rd Year">3rd Year</option>
+                  <option value="4th Year">4th Year</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>Bio &amp; Hackathon Focus</label>
+              <textarea id="profBio" class="glass-input" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+              <label>Skills (comma-separated)</label>
+              <input type="text" id="profSkills" class="glass-input" />
+            </div>
+            <div class="two-col">
+              <div class="form-group">
+                <label>GitHub URL</label>
+                <input type="url" id="profGithub" class="glass-input" placeholder="https://github.com/username" />
+              </div>
+              <div class="form-group">
+                <label>LinkedIn URL</label>
+                <input type="url" id="profLinkedin" class="glass-input" placeholder="https://linkedin.com/in/username" />
+              </div>
+            </div>
+            <div class="align-right">
+              <button type="submit" class="primary-btn">Save Profile Changes</button>
+            </div>
+          </form>
+        </div>
+
+        <div class="side-stack">
+          <div class="glass-panel panel-pad">
+            <h3>Official Campus Circulars</h3>
+            <div id="studentCircularsList" class="stack-list"></div>
+          </div>
+          <div class="glass-panel panel-pad">
+            <h3>Quick Launch</h3>
+            <p class="muted-text">Have a hackathon idea? Pitch your problem statement and recruit teammates across departments.</p>
+            <button class="primary-btn full-width" onclick="openPitchModal()">+ Pitch a New Project</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: MY POSTS & REGISTRATIONS -->
+    <section id="studentTab-posts" class="student-section hidden">
+      <div class="two-col-wide">
+        <div class="glass-panel panel-pad">
+          <div class="panel-header-row">
+            <h3>My Pitched Projects &amp; Squad Applicants</h3>
+            <button class="chip-btn" onclick="openPitchModal()">+ New Pitch</button>
+          </div>
+          <div id="myProjectsList" class="stack-list"></div>
+        </div>
+        <div class="glass-panel panel-pad">
+          <h3>My Event Passes &amp; Role Applications</h3>
+          <div id="myRegistrationsList" class="stack-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: CAMPUS EVENTS -->
+    <section id="studentTab-events" class="student-section hidden">
+      <div class="glass-panel panel-pad">
+        <div class="panel-header-row">
+          <h3>Upcoming Hackathons, Tech Fests &amp; Workshops</h3>
+          <span class="mono-accent">PRESIDENCY UNIVERSITY INNOVATION CELL</span>
+        </div>
+        <div id="studentEventsGrid" class="cards-grid"></div>
+      </div>
+    </section>
+
+    <!-- TAB 4: LIVE PROJECTS -->
+    <section id="studentTab-projects" class="student-section hidden">
+      <div class="glass-panel panel-pad">
+        <div class="panel-header-row">
+          <h3>Open Campus Problem Statements &amp; Squads</h3>
+          <div class="filter-bar">
+            <input type="text" id="projectSearchInput" class="glass-input compact" placeholder="Filter by skill, title, or stack..." oninput="renderLiveProjects()" />
+            <button class="primary-btn" onclick="openPitchModal()">+ Pitch Project</button>
+          </div>
+        </div>
+        <div id="liveProjectsGrid" class="cards-grid"></div>
+      </div>
+    </section>
+
+    <!-- TAB 5: PEER MATCHMAKING -->
+    <section id="studentTab-peers" class="student-section hidden">
+      <div class="glass-panel panel-pad">
+        <div class="panel-header-row">
+          <h3>Skill-Matched Campus Builders</h3>
+          <input type="text" id="peerSearchInput" class="glass-input compact" placeholder="Search Python, IoT, React, UI/UX..." oninput="renderPeers()" />
+        </div>
+        <div id="peersGrid" class="cards-grid"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- =========================================================
+       3. FACULTY ADMINISTRATIVE CONTROL PORTAL
+       ========================================================= -->
+  <div id="adminPortal" class="portal-shell hidden">
+    <header class="topbar">
+      <div class="brand-cluster">
+        <div class="brand-orb">S</div>
+        <div>
+          <div class="brand-name">Synapse</div>
+          <div class="brand-sub">FACULTY ADMINISTRATIVE CONTROL</div>
+        </div>
+      </div>
+      <div class="user-cluster">
+        <div class="user-meta">
+          <div id="navAdminName" class="user-name">Dr. Kavitha Rao</div>
+          <div class="user-id">ADMIN-PU-01 &bull; ADMIN</div>
+        </div>
+        <button class="signout-btn" onclick="signOut()">&#8617; Sign Out</button>
+      </div>
+    </header>
+
+    <section class="glass-panel welcome-banner">
+      <div>
+        <h2>Administrative Control Portal</h2>
+        <p class="muted-text">Presidency University Innovation Cell &bull; Governance, Rosters &amp; Turnout Telemetry</p>
+      </div>
+      <nav class="nav-pills" aria-label="Admin Portal Sections">
+        <button class="nav-pill active" data-admintab="analytics" onclick="switchAdminTab('analytics')">Campus Analytics</button>
+        <button class="nav-pill" data-admintab="events" onclick="switchAdminTab('events')">Events &amp; Rosters</button>
+        <button class="nav-pill" data-admintab="directory" onclick="switchAdminTab('directory')">Student Directory</button>
+        <button class="nav-pill" data-admintab="approvals" onclick="switchAdminTab('approvals')">Project Approvals</button>
+      </nav>
+    </section>
+
+    <!-- ADMIN TAB 1: CAMPUS ANALYTICS -->
+    <section id="adminTab-analytics" class="admin-section">
+      <div class="kpi-grid">
+        <div class="glass-panel kpi-card tilt-card">
+          <div class="kpi-label">VERIFIED STUDENTS</div>
+          <div class="kpi-num" id="kpiStudents">0</div>
+          <div class="kpi-sub" id="kpiVerifiedSub">0 Verified Profiles</div>
+        </div>
+        <div class="glass-panel kpi-card tilt-card">
+          <div class="kpi-label">CAMPUS EVENTS</div>
+          <div class="kpi-num" id="kpiEvents">0</div>
+          <div class="kpi-sub">Active Innovation Sprints</div>
+        </div>
+        <div class="glass-panel kpi-card tilt-card">
+          <div class="kpi-label">TOTAL REGISTRATIONS</div>
+          <div class="kpi-num" id="kpiRegs">0</div>
+          <div class="kpi-sub">Active Squad Passes</div>
+        </div>
+        <div class="glass-panel kpi-card tilt-card">
+          <div class="kpi-label">STUDENT PROJECTS</div>
+          <div class="kpi-num" id="kpiProjects">0</div>
+          <div class="kpi-sub" id="kpiFeaturedSub">0 Featured Spotlights</div>
+        </div>
+      </div>
+
+      <div class="dashboard-grid">
+        <div class="glass-panel panel-pad">
+          <div class="panel-header-row">
+            <h3>Event Turnout &amp; Registration Capacity</h3>
+            <button class="chip-btn" onclick="exportCampusCSV()">&#8681; Export Campus CSV</button>
+          </div>
+          <div id="adminTurnoutBars" class="stack-list"></div>
+        </div>
+
+        <div class="glass-panel panel-pad">
+          <div class="panel-header-row">
+            <h3>Campus Circulars</h3>
+            <button class="primary-btn" onclick="openCircularModal()">+ Broadcast</button>
+          </div>
+          <div id="adminCircularsList" class="stack-list"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ADMIN TAB 2: EVENTS & ROSTERS -->
+    <section id="adminTab-events" class="admin-section hidden">
+      <div class="glass-panel panel-pad">
+        <div class="panel-header-row">
+          <h3>Manage Campus Events &amp; Participant Rosters</h3>
+          <button class="primary-btn" onclick="openNewEventModal()">+ Publish Campus Event</button>
+        </div>
+        <div id="adminEventsList" class="stack-list"></div>
+      </div>
+    </section>
+
+    <!-- ADMIN TAB 3: STUDENT DIRECTORY -->
+    <section id="adminTab-directory" class="admin-section hidden">
+      <div class="glass-panel panel-pad">
+        <div class="panel-header-row">
+          <h3>Registered Student Directory &amp; Verification</h3>
+          <input type="text" id="adminStudentSearch" class="glass-input compact" placeholder="Search roll number, name, or dept..." oninput="renderAdminDirectory()" />
+        </div>
+        <div id="adminStudentsTable" class="stack-list"></div>
+      </div>
+    </section>
+
+    <!-- ADMIN TAB 4: PROJECT APPROVALS -->
+    <section id="adminTab-approvals" class="admin-section hidden">
+      <div class="glass-panel panel-pad">
+        <div class="panel-header-row">
+          <h3>Project Moderation &amp; Spotlight Curation</h3>
+          <span class="mono-accent">FACULTY REVIEW QUEUE</span>
+        </div>
+        <div id="adminProjectsList" class="stack-list"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- =========================================================
+       4. INTERACTIVE MODALS (SQUAD APPLY, PITCH, EVENT, CIRCULAR)
+       ========================================================= -->
+  <!-- Squad Application Modal -->
+  <div id="applyModal" class="modal-backdrop hidden" onclick="closeModalOnBackdrop(event, 'applyModal')">
+    <div class="glass-panel modal-box">
+      <button class="modal-close" onclick="closeModal('applyModal')">&times;</button>
+      <h3 id="applyModalTitle">Project Title</h3>
+      <div class="sub-box">
+        <div class="mono-accent">PROBLEM STATEMENT &amp; ARCHITECTURE</div>
+        <p id="applyModalDesc"></p>
+        <div id="applyModalTags" class="tag-row"></div>
+      </div>
+      <form onsubmit="submitSquadApplication(event)">
+        <input type="hidden" id="applyProjectId" />
+        <h4>Apply to Join Squad &mdash; Complete Your Details</h4>
+        <div class="two-col">
+          <div class="form-group">
+            <label>Applicant Name &amp; USN</label>
+            <input type="text" id="applyApplicantMeta" class="glass-input" readonly />
+          </div>
+          <div class="form-group">
+            <label>Select Open Role</label>
+            <select id="applyRoleSelect" class="glass-input"></select>
+          </div>
+        </div>
+        <div class="two-col">
+          <div class="form-group">
+            <label>Contact Phone / WhatsApp</label>
+            <input type="tel" id="applyPhone" class="glass-input" placeholder="+91 98765 43210" required />
+          </div>
+          <div class="form-group">
+            <label>GitHub / Portfolio Link</label>
+            <input type="url" id="applyPortfolio" class="glass-input" placeholder="https://github.com/..." required />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Attach Resume / CV (PDF, DOCX, max 2MB)</label>
+          <input type="file" id="applyResumeFile" class="glass-input" accept=".pdf,.doc,.docx" />
+        </div>
+        <div class="form-group">
+          <label>Why are you a strong fit for this role?</label>
+          <textarea id="applyPitchNote" class="glass-input" rows="3" placeholder="Highlight relevant hackathon builds, frameworks, or hardware experience..." required></textarea>
+        </div>
+        <button type="submit" class="primary-btn full-width">Submit Squad Application &rarr;</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Pitch New Project Modal -->
+  <div id="pitchModal" class="modal-backdrop hidden" onclick="closeModalOnBackdrop(event, 'pitchModal')">
+    <div class="glass-panel modal-box">
+      <button class="modal-close" onclick="closeModal('pitchModal')">&times;</button>
+      <h3>Pitch a New Campus Project</h3>
+      <form onsubmit="submitNewProject(event)">
+        <div class="form-group">
+          <label>Project Title</label>
+          <input type="text" id="newProjTitle" class="glass-input" placeholder="e.g., CampusPulse: Smart Microgrid & Lab Energy Twin" required />
+        </div>
+        <div class="form-group">
+          <label>Problem Statement &amp; Architecture</label>
+          <textarea id="newProjDesc" class="glass-input" rows="3" placeholder="Describe the technical architecture, hardware/software stack, and campus impact..." required></textarea>
+        </div>
+        <div class="two-col">
+          <div class="form-group">
+            <label>Tech Stack (comma-separated)</label>
+            <input type="text" id="newProjStack" class="glass-input" placeholder="Python, IoT/ESP32, React, Node.js" required />
+          </div>
+          <div class="form-group">
+            <label>Open Squad Roles (comma-separated)</label>
+            <input type="text" id="newProjRoles" class="glass-input" placeholder="Embedded Firmware Lead, Frontend Developer" required />
+          </div>
+        </div>
+        <button type="submit" class="primary-btn full-width">Publish Project Pitch &rarr;</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Event Registration Modal -->
+  <div id="eventRegModal" class="modal-backdrop hidden" onclick="closeModalOnBackdrop(event, 'eventRegModal')">
+    <div class="glass-panel modal-box">
+      <button class="modal-close" onclick="closeModal('eventRegModal')">&times;</button>
+      <h3 id="eventRegTitle">Register Squad for Event</h3>
+      <form onsubmit="submitEventRegistration(event)">
+        <input type="hidden" id="eventRegId" />
+        <div class="form-group">
+          <label>Squad / Team Name</label>
+          <input type="text" id="eventTeamName" class="glass-input" placeholder="e.g., Team CryoSAR" required />
+        </div>
+        <div class="form-group">
+          <label>Team Members &amp; Roll Numbers</label>
+          <input type="text" id="eventTeamMembers" class="glass-input" placeholder="20251CSE0028, 20251CSE0048, 20251CSE0047" required />
+        </div>
+        <div class="form-group">
+          <label>Track / Domain</label>
+          <select id="eventTrackSelect" class="glass-input">
+            <option value="Open Innovation & Agentic AI">Open Innovation &amp; Agentic AI</option>
+            <option value="Smart Hardware & Embedded IoT">Smart Hardware &amp; Embedded IoT</option>
+            <option value="FinTech & Campus Digital Twin">FinTech &amp; Campus Digital Twin</option>
+          </select>
+        </div>
+        <button type="submit" class="primary-btn full-width">Confirm Event Registration &rarr;</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Admin Broadcast Circular Modal -->
+  <div id="circularModal" class="modal-backdrop hidden" onclick="closeModalOnBackdrop(event, 'circularModal')">
+    <div class="glass-panel modal-box">
+      <button class="modal-close" onclick="closeModal('circularModal')">&times;</button>
+      <h3>Broadcast Official Campus Circular</h3>
+      <form onsubmit="submitNewCircular(event)">
+        <div class="two-col">
+          <div class="form-group">
+            <label>Circular Title</label>
+            <input type="text" id="circTitle" class="glass-input" placeholder="e.g., SIH Internal Prelims — Hardware Bench Allocation" required />
+          </div>
+          <div class="form-group">
+            <label>Priority Tag</label>
+            <select id="circTag" class="glass-input">
+              <option value="URGENT">URGENT</option>
+              <option value="GENERAL">GENERAL</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Announcement Body</label>
+          <textarea id="circBody" class="glass-input" rows="3" required></textarea>
+        </div>
+        <button type="submit" class="primary-btn full-width">Broadcast to All Portals &rarr;</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Admin Publish Event Modal -->
+  <div id="newEventModal" class="modal-backdrop hidden" onclick="closeModalOnBackdrop(event, 'newEventModal')">
+    <div class="glass-panel modal-box">
+      <button class="modal-close" onclick="closeModal('newEventModal')">&times;</button>
+      <h3>Publish New Campus Hackathon / Event</h3>
+      <form onsubmit="submitNewEvent(event)">
+        <div class="form-group">
+          <label>Event Title</label>
+          <input type="text" id="evTitle" class="glass-input" placeholder="e.g., Smart India Hackathon (SIH) Internal Prelims" required />
+        </div>
+        <div class="two-col">
+          <div class="form-group">
+            <label>Date &amp; Venue</label>
+            <input type="text" id="evDate" class="glass-input" placeholder="28 Nov 2026 • Auditorium Block A" required />
+          </div>
+          <div class="form-group">
+            <label>Max Squad Capacity</label>
+            <input type="number" id="evCap" class="glass-input" value="120" min="10" required />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Event Description &amp; Rules</label>
+          <textarea id="evDesc" class="glass-input" rows="3" required></textarea>
+        </div>
+        <button type="submit" class="primary-btn full-width">Publish Event &rarr;</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="vault.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
